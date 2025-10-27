@@ -74,16 +74,16 @@
       "UUID": "com.wheatland-community-church.behringer-x32.dca"
     },
     {
-      "Icon": "imgs/actions/mute/icon",
+      "Icon": "imgs/actions/mute-group/icon",
       "Name": "Mute Group",
       "PropertyInspectorPath": "ui/mute-group.html",
       "States": [
         {
-          "Image": "imgs/actions/mute/unmuted",
+          "Image": "imgs/actions/mute-group/inactive",
           "Name": "Inactive"
         },
         {
-          "Image": "imgs/actions/mute/muted",
+          "Image": "imgs/actions/mute-group/active",
           "Name": "Active"
         }
       ],
@@ -99,7 +99,7 @@
   "Icon": "imgs/plugin/icon",
   "URL": "https://github.com/Wheatlandchurch/x32-streamdeck-plugin",
   "UUID": "com.wheatland-community-church.behringer-x32",
-  "Version": "1.0.0",
+  "Version": "2.0.0.0",
   "OS": [
     {
       "Platform": "mac",
@@ -113,8 +113,10 @@
   "Software": {
     "MinimumVersion": "6.6"
   },
-  "Category": "Behringer X32",
+  "Nodejs": {
+    "Version": "20"
+  },
+  "Category": "X32 Mixer Control",
   "CategoryIcon": "imgs/category/icon",
-  "SDKVersion": 2,
-  "NodeVersion": "20"
+  "SDKVersion": 2
 }
