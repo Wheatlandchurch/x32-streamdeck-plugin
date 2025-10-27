@@ -1,0 +1,22 @@
+<svg width="144" height="144" viewBox="0 0 144 144" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#333333"/>
+      <stop offset="100%" style="stop-color:#1a1a1a"/>
+    </linearGradient>
+  </defs>
+  <rect width="144" height="144" rx="20" fill="url(#bg)"/>
+  <!-- Scene icon -->
+  <rect x="30" y="40" width="84" height="64" rx="8" fill="none" stroke="#007acc" stroke-width="3"/>
+  <!-- Memory slots -->
+  <rect x="40" y="55" width="12" height="8" fill="#4ec9b0"/>
+  <rect x="58" y="55" width="12" height="8" fill="#4ec9b0"/>
+  <rect x="76" y="55" width="12" height="8" fill="#007acc"/>
+  <rect x="94" y="55" width="12" height="8" fill="#4ec9b0"/>
+  <rect x="40" y="72" width="12" height="8" fill="#4ec9b0"/>
+  <rect x="58" y="72" width="12" height="8" fill="#ff6b35"/>
+  <rect x="76" y="72" width="12" height="8" fill="#4ec9b0"/>
+  <rect x="94" y="72" width="12" height="8" fill="#4ec9b0"/>
+  <!-- Play button -->
+  <polygon points="72,85 85,92 72,99" fill="#ffcc02"/>
+</svg>

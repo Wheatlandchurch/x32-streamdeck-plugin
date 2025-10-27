@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>DCA Control Configuration</title>
+    <link rel="stylesheet" href="../css/property-inspector.css">
+</head>
+<body>
+    <div class="sdpi-wrapper">
+        <div class="sdpi-heading">X32 Mixer Connection</div>
+        
+        <div class="sdpi-item">
+            <div class="sdpi-item-label">X32 IP Address</div>
+            <input class="sdpi-item-value" id="x32Host" type="text" placeholder="192.168.1.100" />
+        </div>
+        
+        <div class="sdpi-item">
+            <div class="sdpi-item-label">X32 Port</div>
+            <input class="sdpi-item-value" id="x32Port" type="number" placeholder="10023" min="1" max="65535" />
+        </div>
+        
+        <div class="sdpi-heading">DCA Settings</div>
+        
+        <div class="sdpi-item">
+            <div class="sdpi-item-label">DCA Group</div>
+            <select class="sdpi-item-value" id="dca">
+                <option value="">Select DCA</option>
+                <option value="1">DCA 1</option>
+                <option value="2">DCA 2</option>
+                <option value="3">DCA 3</option>
+                <option value="4">DCA 4</option>
+                <option value="5">DCA 5</option>
+                <option value="6">DCA 6</option>
+                <option value="7">DCA 7</option>
+                <option value="8">DCA 8</option>
+            </select>
+        </div>
+        
+        <div class="sdpi-item">
+            <div class="sdpi-item-label">DCA Name</div>
+            <input class="sdpi-item-value" id="dcaName" type="text" placeholder="Enter DCA name" />
+        </div>
+        
+        <div class="sdpi-item">
+            <div class="sdpi-item-label">About DCAs</div>
+            <div class="sdpi-item-value" style="font-size: 12px; color: #999;">
+                DCA (Digital Control Assignment) groups allow you to control multiple channels simultaneously. Use this action to mute/unmute entire DCA groups.
+            </div>
+        </div>
+        
+        <div class="sdpi-item">
+            <div class="sdpi-item-label">Test Connection</div>
+            <button class="sdpi-item-value" id="testConnection" type="button">Test X32 Connection</button>
+        </div>
+        
+        <div class="sdpi-item" id="connectionStatus" style="display: none;">
+            <div class="sdpi-item-label">Status</div>
+            <div class="sdpi-item-value" id="statusText"></div>
+        </div>
+    </div>
+
+    <script src="../js/property-inspector.js"></script>
+</body>
+</html>
