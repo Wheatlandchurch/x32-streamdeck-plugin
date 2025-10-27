@@ -1,0 +1,93 @@
+{
+  "Actions": [
+    {
+      "Icon": "imgs/actions/mute/icon",
+      "Name": "Channel Mute",
+      "PropertyInspectorPath": "ui/channel-mute.html",
+      "States": [
+        {
+          "Image": "imgs/actions/mute/unmuted",
+          "Name": "Unmuted"
+        },
+        {
+          "Image": "imgs/actions/mute/muted",
+          "Name": "Muted"
+        }
+      ],
+      "SupportedInMultiActions": false,
+      "Tooltip": "Mute/unmute a channel on the X32 mixer",
+      "UUID": "com.wheatland-community-church.behringer-x32.mute"
+    },
+    {
+      "Icon": "imgs/actions/fader/icon",
+      "Name": "Channel Fader",
+      "PropertyInspectorPath": "ui/channel-fader.html",
+      "States": [
+        {
+          "Image": "imgs/actions/fader/default",
+          "Name": "Default"
+        }
+      ],
+      "SupportedInMultiActions": false,
+      "Tooltip": "Control channel fader level on the X32 mixer",
+      "UUID": "com.wheatland-community-church.behringer-x32.fader"
+    },
+    {
+      "Icon": "imgs/actions/scene/icon",
+      "Name": "Scene Recall",
+      "PropertyInspectorPath": "ui/scene-recall.html",
+      "States": [
+        {
+          "Image": "imgs/actions/scene/default",
+          "Name": "Default"
+        }
+      ],
+      "SupportedInMultiActions": false,
+      "Tooltip": "Recall a scene on the X32 mixer",
+      "UUID": "com.wheatland-community-church.behringer-x32.scene"
+    },
+    {
+      "Icon": "imgs/actions/dca/icon",
+      "Name": "DCA Control",
+      "PropertyInspectorPath": "ui/dca-control.html",
+      "States": [
+        {
+          "Image": "imgs/actions/dca/unmuted",
+          "Name": "Unmuted"
+        },
+        {
+          "Image": "imgs/actions/dca/muted",
+          "Name": "Muted"
+        }
+      ],
+      "SupportedInMultiActions": false,
+      "Tooltip": "Control DCA groups on the X32 mixer",
+      "UUID": "com.wheatland-community-church.behringer-x32.dca"
+    }
+  ],
+  "Author": "Wheatland Church",
+  "CodePath": "bin/plugin.js",
+  "Description": "Control your Behringer X32 digital mixer directly from Stream Deck. Features include channel mute/unmute, fader control, scene recall, and DCA management.",
+  "Name": "X32 Mixer Control",
+  "Icon": "imgs/plugin/icon",
+  "URL": "https://github.com/Wheatlandchurch/x32-streamdeck-plugin",
+  "UUID": "com.wheatland-community-church.behringer-x32",
+  "Version": "1.0.0",
+  "OS": [
+    {
+      "Platform": "mac",
+      "MinimumVersion": "10.15"
+    },
+    {
+      "Platform": "windows",
+      "MinimumVersion": "10"
+    }
+  ],
+  "Software": {
+    "MinimumVersion": "6.4"
+  },
+  "Category": "Audio",
+  "CategoryIcon": "imgs/category/icon",
+  "SDKVersion": 2,
+  "NodeVersion": "20"
+}

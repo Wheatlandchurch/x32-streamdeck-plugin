@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Channel Fader Configuration</title>
+    <link rel="stylesheet" href="../css/property-inspector.css">
+</head>
+<body>
+    <div class="sdpi-wrapper">
+        <div class="sdpi-heading">X32 Mixer Connection</div>
+        
+        <div class="sdpi-item">
+            <div class="sdpi-item-label">X32 IP Address</div>
+            <input class="sdpi-item-value" id="x32Host" type="text" placeholder="192.168.1.100" />
+        </div>
+        
+        <div class="sdpi-item">
+            <div class="sdpi-item-label">X32 Port</div>
+            <input class="sdpi-item-value" id="x32Port" type="number" placeholder="10023" min="1" max="65535" />
+        </div>
+        
+        <div class="sdpi-heading">Channel Settings</div>
+        
+        <div class="sdpi-item">
+            <div class="sdpi-item-label">Channel Number</div>
+            <select class="sdpi-item-value" id="channel">
+                <option value="">Select Channel</option>
+                <!-- Input Channels -->
+                <option value="1">01 - Input 1</option>
+                <option value="2">02 - Input 2</option>
+                <option value="3">03 - Input 3</option>
+                <option value="4">04 - Input 4</option>
+                <option value="5">05 - Input 5</option>
+                <option value="6">06 - Input 6</option>
+                <option value="7">07 - Input 7</option>
+                <option value="8">08 - Input 8</option>
+                <option value="9">09 - Input 9</option>
+                <option value="10">10 - Input 10</option>
+                <option value="11">11 - Input 11</option>
+                <option value="12">12 - Input 12</option>
+                <option value="13">13 - Input 13</option>
+                <option value="14">14 - Input 14</option>
+                <option value="15">15 - Input 15</option>
+                <option value="16">16 - Input 16</option>
+                <option value="17">17 - Input 17</option>
+                <option value="18">18 - Input 18</option>
+                <option value="19">19 - Input 19</option>
+                <option value="20">20 - Input 20</option>
+                <option value="21">21 - Input 21</option>
+                <option value="22">22 - Input 22</option>
+                <option value="23">23 - Input 23</option>
+                <option value="24">24 - Input 24</option>
+                <option value="25">25 - Input 25</option>
+                <option value="26">26 - Input 26</option>
+                <option value="27">27 - Input 27</option>
+                <option value="28">28 - Input 28</option>
+                <option value="29">29 - Input 29</option>
+                <option value="30">30 - Input 30</option>
+                <option value="31">31 - Input 31</option>
+                <option value="32">32 - Input 32</option>
+            </select>
+        </div>
+        
+        <div class="sdpi-heading">Fader Settings</div>
+        
+        <div class="sdpi-item">
+            <div class="sdpi-item-label">Step Size</div>
+            <select class="sdpi-item-value" id="step">
+                <option value="0.01">Fine (1%)</option>
+                <option value="0.025">Small (2.5%)</option>
+                <option value="0.05" selected>Medium (5%)</option>
+                <option value="0.1">Large (10%)</option>
+            </select>
+        </div>
+        
+        <div class="sdpi-item">
+            <div class="sdpi-item-label">Usage</div>
+            <div class="sdpi-item-value" style="font-size: 12px; color: #999;">
+                • Key press: Set to unity (0dB)<br>
+                • Dial rotate: Adjust level<br>
+                • Touch tap: Refresh current level
+            </div>
+        </div>
+        
+        <div class="sdpi-item">
+            <div class="sdpi-item-label">Test Connection</div>
+            <button class="sdpi-item-value" id="testConnection" type="button">Test X32 Connection</button>
+        </div>
+        
+        <div class="sdpi-item" id="connectionStatus" style="display: none;">
+            <div class="sdpi-item-label">Status</div>
+            <div class="sdpi-item-value" id="statusText"></div>
+        </div>
+    </div>
+
+    <script src="../js/property-inspector.js"></script>
+</body>
+</html>

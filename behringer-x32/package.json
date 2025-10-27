@@ -1,0 +1,37 @@
+{
+  "name": "com.wheatland-community-church.behringer-x32",
+  "version": "1.0.0",
+  "description": "Stream Deck plugin for controlling Behringer X32 digital mixer",
+  "main": "bin/plugin.js",
+  "scripts": {
+    "build": "rollup -c",
+    "watch": "rollup -c -w --watch.onEnd=\"streamdeck restart com.wheatland-community-church.behringer-x32\"",
+    "dev": "npm run watch"
+  },
+  "keywords": [
+    "streamdeck",
+    "plugin",
+    "x32",
+    "behringer",
+    "mixer",
+    "audio"
+  ],
+  "author": "Wheatland Church",
+  "license": "MIT",
+  "devDependencies": {
+    "@elgato/cli": "^1.1.0",
+    "@rollup/plugin-commonjs": "^25.0.7",
+    "@rollup/plugin-json": "^6.1.0",
+    "@rollup/plugin-node-resolve": "^15.2.3",
+    "@rollup/plugin-typescript": "^11.1.6",
+    "@types/node": "^20.11.17",
+    "@types/node-osc": "^9.1.0",
+    "rollup": "^4.10.0",
+    "tslib": "^2.6.2",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "@elgato/streamdeck": "^1.0.0",
+    "node-osc": "^11.0.0"
+  }
+}
