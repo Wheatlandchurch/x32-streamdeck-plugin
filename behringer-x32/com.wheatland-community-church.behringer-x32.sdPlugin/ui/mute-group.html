@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mute Group Control Configuration</title>
+    <link rel="stylesheet" href="../css/property-inspector.css">
+</head>
+<body>
+    <div class="sdpi-wrapper">
+        <div class="sdpi-heading">Mute Group Control</div>
+        <div class="sdpi-description">Configure mute group control for the X32 mixer</div>
+        
+        <div class="sdpi-item">
+            <div class="sdpi-item-label">X32 Host</div>
+            <input class="sdpi-item-value" type="text" id="x32Host" placeholder="192.168.1.100">
+        </div>
+        
+        <div class="sdpi-item">
+            <div class="sdpi-item-label">X32 Port</div>
+            <input class="sdpi-item-value" type="number" id="x32Port" placeholder="10023" min="1" max="65535">
+        </div>
+        
+        <div class="sdpi-item">
+            <div class="sdpi-item-label">Mute Group</div>
+            <select class="sdpi-item-value" id="muteGroup">
+                <option value="1">Mute Group 1</option>
+                <option value="2">Mute Group 2</option>
+                <option value="3">Mute Group 3</option>
+                <option value="4">Mute Group 4</option>
+                <option value="5">Mute Group 5</option>
+                <option value="6">Mute Group 6</option>
+            </select>
+        </div>
+        
+        <div class="sdpi-item">
+            <div class="sdpi-item-label">Display Name</div>
+            <input class="sdpi-item-value" type="text" id="muteGroupName" placeholder="Mute Group 1">
+        </div>
+    </div>
+    
+    <script src="../js/property-inspector.js"></script>
+</body>
+</html>

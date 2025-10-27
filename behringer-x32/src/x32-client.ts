@@ -135,6 +135,17 @@ export class X32Client extends EventEmitter {
     await this.send(address);
   }
 
+  // Mute group control methods
+  async setMuteGroup(muteGroup: number, active: boolean): Promise<void> {
+    const address = `/config/mute/${muteGroup}`;
+    await this.send(address, active ? 1 : 0);
+  }
+
+  async getMuteGroupState(muteGroup: number): Promise<void> {
+    const address = `/config/mute/${muteGroup}`;
+    await this.send(address);
+  }
+
   // Subscription management for status updates
   subscribeToChannel(channel: number): void {
     this.subscriptions.add(`ch_${channel}`);
@@ -142,6 +153,10 @@ export class X32Client extends EventEmitter {
 
   subscribeToDCA(dca: number): void {
     this.subscriptions.add(`dca_${dca}`);
+  }
+
+  subscribeToMuteGroup(muteGroup: number): void {
+    this.subscriptions.add(`mutegroup_${muteGroup}`);
   }
 
   unsubscribeFromChannel(channel: number): void {
@@ -152,10 +167,14 @@ export class X32Client extends EventEmitter {
     this.subscriptions.delete(`dca_${dca}`);
   }
 
+  unsubscribeFromMuteGroup(muteGroup: number): void {
+    this.subscriptions.delete(`mutegroup_${muteGroup}`);
+  }
+
   private startStatusPolling(): void {
     if (!this.connected) return;
 
-    // Poll every 500ms for subscribed channels/DCAs
+    // Poll every 500ms for subscribed channels/DCAs/mute groups
     const pollInterval = setInterval(() => {
       if (!this.connected) {
         clearInterval(pollInterval);
@@ -170,6 +189,9 @@ export class X32Client extends EventEmitter {
         } else if (subscription.startsWith('dca_')) {
           const dca = parseInt(subscription.split('_')[1]);
           this.getDCAMuteStatus(dca).catch(() => {});
+        } else if (subscription.startsWith('mutegroup_')) {
+          const muteGroup = parseInt(subscription.split('_')[1]);
+          this.getMuteGroupState(muteGroup).catch(() => {});
         }
       });
     }, 500);

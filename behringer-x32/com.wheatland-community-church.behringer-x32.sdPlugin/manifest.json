@@ -28,6 +28,15 @@
           "Name": "Default"
         }
       ],
+      "Controllers": ["Encoder", "Keypad"],
+      "Encoder": {
+        "background": "imgs/actions/fader/default",
+        "TriggerDescription": {
+          "Rotate": "Adjust fader level",
+          "Push": "Configurable action (default: mute/unmute)",
+          "Touch": "Toggle between current and unity (0dB)"
+        }
+      },
       "SupportedInMultiActions": false,
       "Tooltip": "Control channel fader level on the X32 mixer",
       "UUID": "com.wheatland-community-church.behringer-x32.fader"
@@ -63,6 +72,24 @@
       "SupportedInMultiActions": false,
       "Tooltip": "Control DCA groups on the X32 mixer",
       "UUID": "com.wheatland-community-church.behringer-x32.dca"
+    },
+    {
+      "Icon": "imgs/actions/mute/icon",
+      "Name": "Mute Group",
+      "PropertyInspectorPath": "ui/mute-group.html",
+      "States": [
+        {
+          "Image": "imgs/actions/mute/unmuted",
+          "Name": "Inactive"
+        },
+        {
+          "Image": "imgs/actions/mute/muted",
+          "Name": "Active"
+        }
+      ],
+      "SupportedInMultiActions": false,
+      "Tooltip": "Control mute groups on the X32 mixer",
+      "UUID": "com.wheatland-community-church.behringer-x32.mutegroup"
     }
   ],
   "Author": "Wheatland Church",
@@ -84,9 +111,9 @@
     }
   ],
   "Software": {
-    "MinimumVersion": "6.4"
+    "MinimumVersion": "6.6"
   },
-  "Category": "Audio",
+  "Category": "Behringer X32",
   "CategoryIcon": "imgs/category/icon",
   "SDKVersion": 2,
   "NodeVersion": "20"

@@ -3,6 +3,7 @@
 ## Prerequisites
 
 1. **Stream Deck Software**: Download and install from [Elgato's website](https://www.elgato.com/downloads)
+   - **Minimum Version**: 6.6+ (required for Stream Deck+ dial support)
 2. **Node.js**: Download version 20+ from [nodejs.org](https://nodejs.org/) (for development only)
 
 ## Method 1: Release Installation (Recommended)
@@ -10,7 +11,8 @@
 1. Go to the [Releases page](https://github.com/Wheatlandchurch/x32-streamdeck-plugin/releases)
 2. Download the latest `.streamDeckPlugin` file
 3. Double-click the file to install
-4. The plugin will appear in Stream Deck under "Audio" category
+4. The plugin will appear in Stream Deck under **"Behringer X32"** category
+5. Actions will be available for both buttons and dials (Stream Deck+ only)
 
 ## Method 2: Development Installation
 
@@ -63,19 +65,33 @@ The plugin will automatically install into Stream Deck during the build process.
 
 ### Step 1: Add Actions to Stream Deck
 1. Open Stream Deck software
-2. Locate "X32 Mixer Control" in the actions list (Audio category)
-3. Drag desired actions to Stream Deck buttons:
-   - Channel Mute
-   - Channel Fader
-   - Scene Recall
-   - DCA Control
+2. Locate **"Behringer X32"** in the actions list 
+3. Available actions:
+   - **Channel Mute**: Basic mute control for any channel
+   - **Channel Fader**: Enhanced fader control (⭐ optimized for Stream Deck+ dials)
+   - **Scene Recall**: Load and recall mixer scenes
+   - **DCA Control**: Control DCA group muting
+   - **Mute Group**: Control X32 mute groups (⭐ new feature)
+4. Drag desired actions to Stream Deck buttons or dials (Stream Deck+ only)
 
 ### Step 2: Configure Each Action
-1. Select a button with an X32 action
+1. Select a button/dial with an X32 action
 2. In the Property Inspector panel, configure:
    - **X32 IP Address**: Enter your mixer's IP (e.g., `192.168.1.100`)
    - **X32 Port**: Enter `10023` (default OSC port)
    - **Action-specific settings**: Channel number, scene number, etc.
+
+### Step 3: Stream Deck+ Dial Configuration (Enhanced Features)
+For **Channel Fader** actions on Stream Deck+ dials:
+1. **Dial Press Action** (choose one):
+   - **Mute/Unmute** (recommended): Press dial to toggle channel mute
+   - **Unity Gain**: Press dial to set fader to 0dB reference level
+   - **Fine Adjustment**: Hold dial while rotating for precision control
+2. **Step Size Configuration**:
+   - **Normal Step**: Regular rotation adjustment (1%-10%, default: 5%)
+   - **Fine Step**: Precision adjustment increment (0.1%-2.5%, default: 1%)
+
+### Step 4: Test and Verify
 3. Click "Test X32 Connection" to verify setup
 4. Look for "Connection successful" message
 

@@ -5,6 +5,59 @@ All notable changes to the X32 Stream Deck Plugin will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2025-10-27
+
+### Added ⭐ Major Update
+- **Stream Deck+ Dial Support**: Full optimization for Stream Deck+ rotary encoders
+- **Mute Group Control**: New action for controlling X32 mute groups (1-6)
+- **Configurable Dial Press Actions**: Three modes for Channel Fader dial press behavior
+- **Enhanced Visual Feedback**: Dial indicators and improved status display
+- **Professional Category Organization**: Actions now appear under "Behringer X32" category
+
+### Enhanced Channel Fader
+- **Stream Deck+ Optimization**: Native dial support with smooth rotation control
+- **Configurable Dial Press**: Choose between three press actions:
+  - **Mute/Unmute** (default): Instant channel muting
+  - **Unity Gain**: Quick 0dB reference setting  
+  - **Fine Adjustment**: Precision control mode
+- **Dual Step Sizes**: Separate normal and fine adjustment increments
+- **Enhanced Feedback**: Shows fader level, mute status, and dial position
+- **Real-time Updates**: Monitors both fader and mute status from mixer
+
+### New Mute Group Action
+- **Batch Muting**: Control X32 mute groups for multiple channel management
+- **Custom Naming**: Configurable display names for each mute group
+- **Status Feedback**: Real-time active/inactive status display
+- **Professional Workflow**: Perfect for live performance and recording scenarios
+
+### Technical Improvements
+- **Enhanced OSC Client**: Added mute group communication support
+- **Improved Manifest**: Proper Stream Deck+ controller definitions
+- **Updated UI**: New configuration options for dial press behavior
+- **Better Documentation**: Comprehensive Stream Deck+ feature guide
+
+### User Experience
+- **Category Organization**: All actions now grouped under "Behringer X32"
+- **Intuitive Controls**: Logical dial behavior with professional workflow support
+- **Visual Clarity**: Enhanced status indicators and feedback
+- **Backward Compatibility**: All features work on standard Stream Deck devices
+
+### Configuration Updates
+- **Minimum Software Version**: Now requires Stream Deck software v6.6+
+- **New Settings**: Dial press action configuration and fine step size control
+- **Enhanced Property Inspectors**: Updated UI with new configuration options
+- **Improved Documentation**: Updated README, INSTALL, and new STREAMDECK_PLUS guides
+
+### Breaking Changes
+- **UUID Updates**: Action UUIDs changed to match new plugin identifier structure
+- **Category Change**: Actions moved from "Audio" to "Behringer X32" category
+- **Software Requirements**: Stream Deck v6.6+ required for dial features
+
+### Migration Guide
+- Existing users should uninstall previous version before installing v2.0.0
+- Re-configure actions after installation (UUIDs have changed)
+- Stream Deck+ users can now assign Channel Fader to dials for enhanced control
+
 ## [1.0.0] - 2025-10-27
 
 ### Added

@@ -74,11 +74,31 @@
         </div>
         
         <div class="sdpi-item">
+            <div class="sdpi-item-label">Fine Step Size (Dial Pressed)</div>
+            <select class="sdpi-item-value" id="fineStep">
+                <option value="0.001">Ultra Fine (0.1%)</option>
+                <option value="0.005">Very Fine (0.5%)</option>
+                <option value="0.01" selected>Fine (1%)</option>
+                <option value="0.025">Small (2.5%)</option>
+            </select>
+        </div>
+        
+        <div class="sdpi-item">
+            <div class="sdpi-item-label">Dial Press Action</div>
+            <select class="sdpi-item-value" id="dialPressAction">
+                <option value="mute" selected>Mute/Unmute Channel</option>
+                <option value="unity">Set to Unity (0dB)</option>
+                <option value="fine">Enable Fine Adjustment</option>
+            </select>
+        </div>
+        
+        <div class="sdpi-item">
             <div class="sdpi-item-label">Usage</div>
             <div class="sdpi-item-value" style="font-size: 12px; color: #999;">
                 • Key press: Set to unity (0dB)<br>
-                • Dial rotate: Adjust level<br>
-                • Touch tap: Refresh current level
+                • Dial rotate: Adjust level (normal step)<br>
+                • Dial press: Configurable action (default: mute/unmute)<br>
+                • Touch tap: Toggle between current and unity/mute
             </div>
         </div>
         
