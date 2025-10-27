@@ -42,8 +42,8 @@ A comprehensive Stream Deck plugin for controlling Behringer X32 digital mixers 
 
 ### 2. Plugin Installation
 
-1. Download the latest release from the [releases page](https://github.com/Wheatlandchurch/x32-streamdeck-plugin/releases)
-2. Double-click the `.streamDeckPlugin` file to install
+1. Build the plugin from source (see [Development Setup](#-development-setup) below)
+2. Double-click the generated `.streamDeckPlugin` file to install
 3. The plugin will appear in the Stream Deck actions list under "Behringer X32" category
 
 ### 3. Basic Configuration
