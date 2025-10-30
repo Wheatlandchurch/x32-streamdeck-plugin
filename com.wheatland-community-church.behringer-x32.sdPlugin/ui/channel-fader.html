@@ -63,7 +63,7 @@
         
         <div class="sdpi-heading">Fader Settings</div>
         
-        <div class="sdpi-item">
+        <div class="sdpi-item" id="stepSetting">
             <div class="sdpi-item-label">Step Size</div>
             <select class="sdpi-item-value" id="step">
                 <option value="0.01">Fine (1%)</option>
@@ -73,7 +73,7 @@
             </select>
         </div>
         
-        <div class="sdpi-item">
+        <div class="sdpi-item" id="fineStepSetting">
             <div class="sdpi-item-label">Fine Step Size (Dial Pressed)</div>
             <select class="sdpi-item-value" id="fineStep">
                 <option value="0.001">Ultra Fine (0.1%)</option>
@@ -83,7 +83,7 @@
             </select>
         </div>
         
-        <div class="sdpi-item">
+        <div class="sdpi-item" id="dialPressActionSetting">
             <div class="sdpi-item-label">Dial Press Action</div>
             <select class="sdpi-item-value" id="dialPressAction">
                 <option value="mute" selected>Mute/Unmute Channel</option>
@@ -94,11 +94,8 @@
         
         <div class="sdpi-item">
             <div class="sdpi-item-label">Usage</div>
-            <div class="sdpi-item-value" style="font-size: 12px; color: #999;">
-                • Key press: Set to unity (0dB)<br>
-                • Dial rotate: Adjust level (normal step)<br>
-                • Dial press: Configurable action (default: mute/unmute)<br>
-                • Touch tap: Toggle between current and unity/mute
+            <div class="sdpi-item-value" id="usageInfo" style="font-size: 12px; color: #999;">
+                <!-- Usage instructions will be dynamically inserted based on controller type -->
             </div>
         </div>
         

@@ -5,6 +5,21 @@ All notable changes to the X32 Stream Deck Plugin will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] - 2025-10-30
+
+### Fixed
+- **Icon Quality**: Regenerated all icons at proper SDK-specified sizes (72x72/@1x, 144x144/@2x for actions; 256x256/@1x, 512x512/@2x for plugin)
+- **Icon Centering**: Fixed centering for plugin icons and mute group icons
+- **Marketplace Media**: Added professional marketplace media assets with proper bullet point rendering
+
+### Added
+- **Marketplace Assets**: Created 5 professional media assets for Elgato Marketplace submission
+  - Hero banner (1920x960)
+  - Features overview (1600x900)
+  - Stream Deck layout example (1200x768)
+  - Channel fader demonstration (1200x1486)
+  - Scene recall demonstration (1200x1494)
+
 ## [2.0.0] - 2025-10-27
 
 ### Added ⭐ Major Update

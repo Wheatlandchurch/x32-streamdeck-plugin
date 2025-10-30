@@ -36,6 +36,47 @@ function loadSettings() {
     if (actionInfo && actionInfo.payload && actionInfo.payload.settings) {
         loadSettingsFromPayload(actionInfo.payload.settings);
     }
+    
+    // Update usage instructions based on controller type
+    updateUsageInstructions();
+}
+
+// Update usage instructions based on controller type
+function updateUsageInstructions() {
+    const usageInfo = document.getElementById('usageInfo');
+    if (!usageInfo) return;
+    
+    // Check if this is on an encoder (dial) or keypad (button)
+    const controller = actionInfo?.payload?.controller || 'Keypad';
+    
+    // Get dial-specific setting elements
+    const fineStepSetting = document.getElementById('fineStepSetting');
+    const dialPressActionSetting = document.getElementById('dialPressActionSetting');
+    const stepSetting = document.getElementById('stepSetting');
+    
+    if (controller === 'Encoder') {
+        // Stream Deck+ with dial - show all settings
+        if (fineStepSetting) fineStepSetting.style.display = 'flex';
+        if (dialPressActionSetting) dialPressActionSetting.style.display = 'flex';
+        if (stepSetting) stepSetting.style.display = 'flex';
+        
+        usageInfo.innerHTML = `
+            <strong>Stream Deck+ Dial Controls:</strong><br>
+            • Rotate: Adjust fader level with visual feedback<br>
+            • Press: Configurable action (see setting above)<br>
+            • Touch: Toggle between current level and unity (0dB)
+        `;
+    } else {
+        // Regular Stream Deck button - hide dial-specific settings
+        if (fineStepSetting) fineStepSetting.style.display = 'none';
+        if (dialPressActionSetting) dialPressActionSetting.style.display = 'none';
+        if (stepSetting) stepSetting.style.display = 'none';
+        
+        usageInfo.innerHTML = `
+            <strong>Button Controls:</strong><br>
+            • Press: Set fader to unity gain (0dB)
+        `;
+    }
 }
 
 // Load settings into the UI

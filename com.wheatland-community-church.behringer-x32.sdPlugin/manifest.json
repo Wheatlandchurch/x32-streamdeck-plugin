@@ -15,7 +15,7 @@
 				}
 			],
 			"SupportedInMultiActions": false,
-			"Tooltip": "Mute/unmute a channel on the X32 mixer",
+			"Tooltip": "Toggle mute status for individual mixer channels (1-32). Button displays current mute state with visual feedback - green when unmuted, red when muted. Essential for quick channel control during live performances.",
 			"UUID": "com.wheatland-community-church.behringer-x32.mute"
 		},
 		{
@@ -35,13 +35,13 @@
 			"Encoder": {
 				"background": "imgs/actions/fader/default",
 				"TriggerDescription": {
-					"Rotate": "Adjust fader level",
-					"Push": "Configurable action (default: mute/unmute)",
-					"Touch": "Toggle between current and unity (0dB)"
+					"Rotate": "Adjust fader level smoothly with real-time visual feedback showing current dB level",
+					"Push": "Configurable: mute/unmute channel (default), set to unity (0dB), or enable fine adjustment mode",
+					"Touch": "Instantly toggle between current fader position and unity gain (0dB) reference level"
 				}
 			},
 			"SupportedInMultiActions": false,
-			"Tooltip": "Control channel fader level on the X32 mixer",
+			"Tooltip": "Control channel fader levels (1-32) with precision. On Stream Deck+: rotate dial for smooth level adjustments with dB display, press for mute/unity, touch for quick 0dB reference. On regular Stream Deck: press to set unity gain (0dB). Perfect for live mixing and gain staging.",
 			"UUID": "com.wheatland-community-church.behringer-x32.fader"
 		},
 		{
@@ -55,7 +55,7 @@
 				}
 			],
 			"SupportedInMultiActions": false,
-			"Tooltip": "Recall a scene on the X32 mixer",
+			"Tooltip": "Instantly recall saved mixer scenes (1-100). Configure optional double-tap confirmation to prevent accidental scene changes. Displays custom scene names and provides visual feedback during recall. Ideal for worship services, concerts, and events with multiple configurations.",
 			"UUID": "com.wheatland-community-church.behringer-x32.scene"
 		},
 		{
@@ -73,7 +73,7 @@
 				}
 			],
 			"SupportedInMultiActions": false,
-			"Tooltip": "Control DCA groups on the X32 mixer",
+			"Tooltip": "Control Digital Control Assignment (DCA) groups (1-8) for managing multiple channels simultaneously. Toggle mute state for entire DCA groups with custom naming support. Visual feedback shows current group status. Perfect for controlling instrument sections, vocal groups, or complex routing configurations.",
 			"UUID": "com.wheatland-community-church.behringer-x32.dca"
 		},
 		{
@@ -91,18 +91,18 @@
 				}
 			],
 			"SupportedInMultiActions": false,
-			"Tooltip": "Control mute groups on the X32 mixer",
+			"Tooltip": "Control X32 mute groups (1-6) for batch channel muting. Toggle entire groups of channels on/off with a single button press. Displays custom group names and active/inactive status. Essential for managing complex channel configurations, house-of-worship applications, and live events.",
 			"UUID": "com.wheatland-community-church.behringer-x32.mutegroup"
 		}
 	],
 	"Author": "Wheatland Church",
 	"CodePath": "bin/plugin.js",
-	"Description": "Control your Behringer X32 digital mixer directly from Stream Deck. Features include channel mute/unmute, fader control, scene recall, and DCA management.",
+	"Description": "Professional control for Behringer X32 digital mixers via OSC protocol. Control channel muting (1-32), precise fader levels with Stream Deck+ dial support, recall mixer scenes (1-100), manage DCA groups (1-8), and control mute groups (1-6). Features real-time feedback, automatic reconnection, and optimized performance for live sound environments. Perfect for worship services, live events, recording studios, and any venue using X32 mixers.",
 	"Name": "X32 Mixer Control",
 	"Icon": "imgs/plugin/icon",
 	"URL": "https://github.com/Wheatlandchurch/x32-streamdeck-plugin",
 	"UUID": "com.wheatland-community-church.behringer-x32",
-	"Version": "2.0.0.0",
+	"Version": "2.0.1.0",
 	"OS": [
 		{
 			"Platform": "mac",

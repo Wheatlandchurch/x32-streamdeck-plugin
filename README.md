@@ -303,6 +303,16 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **[Installation Guide](INSTALL.md)**: Complete setup instructions
 - **[Stream Deck+ Features](STREAMDECK_PLUS.md)**: Enhanced dial functionality guide  
 - **[Changelog](CHANGELOG.md)**: Version history and updates
+- **[Marketplace Media](marketplace-media/README.md)**: Professional product images and assets
+- **[Resubmission Checklist](RESUBMISSION_CHECKLIST.md)**: Elgato Marketplace submission guide
+
+## 📸 Screenshots
+
+Professional marketplace media assets are available in the `marketplace-media/` folder, including:
+- Hero banner showcasing plugin features
+- Feature overview with key capabilities
+- Stream Deck integration examples
+- Channel fader and scene recall demonstrations
 
 ---
 

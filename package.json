@@ -1,6 +1,6 @@
 {
   "name": "com.wheatland-community-church.behringer-x32",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Stream Deck plugin for controlling Behringer X32 digital mixer",
   "main": "bin/plugin.js",
   "scripts": {
