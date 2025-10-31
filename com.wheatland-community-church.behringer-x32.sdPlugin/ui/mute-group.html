@@ -17,9 +17,15 @@
         </div>
         
         <div class="sdpi-item">
-            <div class="sdpi-item-label">X32 Port</div>
-            <input class="sdpi-item-value" type="number" id="x32Port" placeholder="10023" min="1" max="65535">
+            <div class="sdpi-item-label"></div>
+            <button class="sdpi-item-value" id="testConnection" onclick="testConnection()">Test Connection</button>
         </div>
+        
+        <div id="connectionStatus" style="display: none; margin: 10px 0; padding: 10px; border-radius: 4px;">
+            <span id="statusText"></span>
+        </div>
+        
+        <div class="sdpi-heading">Mute Group Settings</div>
         
         <div class="sdpi-item">
             <div class="sdpi-item-label">Mute Group</div>

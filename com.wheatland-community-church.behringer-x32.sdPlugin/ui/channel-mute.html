@@ -11,12 +11,25 @@
         
         <div class="sdpi-item">
             <div class="sdpi-item-label">X32 IP Address</div>
-            <input class="sdpi-item-value" id="x32Host" type="text" placeholder="192.168.1.100" />
+            <input class="sdpi-item-value" id="x32Host" type="text" placeholder="192.168.1.105" />
+        </div>
+        
+        <div class="sdpi-item" style="margin: 10px 0;">
+            <details style="padding: 10px; background: #2d2d2d; border-radius: 4px; border-left: 3px solid #ff8c00;">
+                <summary style="cursor: pointer; font-weight: bold; color: #ff8c00;">⚠️ X32 Must Use OSC Protocol</summary>
+                <p style="margin: 10px 0 0 0; font-size: 12px; line-height: 1.5;">
+                    On the X32: Press <strong>SETUP</strong> → <strong>Network</strong> → Set <strong>Remote Protocol</strong> to <strong>"OSC"</strong> (not Mackie MCU).
+                </p>
+            </details>
         </div>
         
         <div class="sdpi-item">
-            <div class="sdpi-item-label">X32 Port</div>
-            <input class="sdpi-item-value" id="x32Port" type="number" placeholder="10023" min="1" max="65535" />
+            <div class="sdpi-item-label"></div>
+            <button class="sdpi-item-value" id="testConnection" onclick="testConnection()">Test Connection</button>
+        </div>
+        
+        <div id="connectionStatus" style="display: none; margin: 10px 0; padding: 10px; border-radius: 4px;">
+            <span id="statusText"></span>
         </div>
         
         <div class="sdpi-heading">Channel Settings</div>

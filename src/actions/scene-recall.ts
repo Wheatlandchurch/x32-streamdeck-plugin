@@ -1,9 +1,8 @@
-import streamDeck, { action, KeyDownEvent, SingletonAction, WillAppearEvent } from "@elgato/streamdeck";
+import streamDeck, { action, KeyDownEvent, SendToPluginEvent, SingletonAction, WillAppearEvent } from "@elgato/streamdeck";
 import { X32Client } from "../x32-client";
 
 type Settings = {
   x32Host?: string;
-  x32Port?: number;
   scene?: number;
   sceneName?: string;
   confirmRecall?: boolean; // Require double-tap for scene recall
@@ -23,7 +22,6 @@ export class SceneRecallAction extends SingletonAction<Settings> {
       await ev.action.setSettings({
         ...settings,
         x32Host: "192.168.1.100",
-        x32Port: 10023,
         scene: 1,
         sceneName: "Scene 1",
         confirmRecall: true
@@ -59,16 +57,15 @@ export class SceneRecallAction extends SingletonAction<Settings> {
       this.lastKeyPressTime = currentTime;
 
       if (settings.confirmRecall && !isDoubleTab) {
-        // First tap - just load the scene (preview)
-        await this.x32Client.loadScene(settings.scene);
-        await ev.action.setTitle(`${settings.sceneName || `Scene ${settings.scene}`}\\nLoaded\\n(Tap again to GO)`);
+        // First tap - show confirmation prompt
+        await ev.action.setTitle(`${settings.sceneName || `Scene ${settings.scene}`}\\nTap again\\nto RECALL`);
         
         // Reset title after 2 seconds
         setTimeout(async () => {
           await this.updateButtonTitle(ev.action);
         }, 2000);
         
-        streamDeck.logger.info(`Scene ${settings.scene} loaded (preview)`);
+        streamDeck.logger.info(`Scene ${settings.scene} - awaiting confirmation`);
       } else {
         // Second tap or no confirmation required - recall the scene
         await this.x32Client.recallScene(settings.scene);
@@ -88,15 +85,54 @@ export class SceneRecallAction extends SingletonAction<Settings> {
     }
   }
 
+  override async onSendToPlugin(ev: SendToPluginEvent<any, Settings>): Promise<void> {
+    const payload = ev.payload as any;
+    
+    // Handle connection test request from property inspector
+    if (payload.action === 'testConnection') {
+      streamDeck.logger.info(`Testing connection to ${payload.host}:10023`);
+      
+      try {
+        const testClient = new X32Client({
+          host: payload.host,
+          port: 10023
+        });
+
+        await testClient.connect();
+        
+        // Send success message back to property inspector
+        streamDeck.ui.current?.sendToPropertyInspector({
+          event: 'connectionTestResult',
+          success: true,
+          message: `Successfully connected to X32 at ${payload.host}:10023`
+        });
+        
+        streamDeck.logger.info("Connection test successful");
+        
+        // Clean up test client
+        testClient.disconnect();
+      } catch (error) {
+        // Send error message back to property inspector
+        streamDeck.ui.current?.sendToPropertyInspector({
+          event: 'connectionTestResult',
+          success: false,
+          message: `Failed to connect: ${error instanceof Error ? error.message : 'Unknown error'}`
+        });
+        
+        streamDeck.logger.error("Connection test failed:", error);
+      }
+    }
+  }
+
   private async connectToX32(settings: Settings): Promise<void> {
-    if (!settings.x32Host || !settings.x32Port) {
+    if (!settings.x32Host) {
       return;
     }
 
     try {
       this.x32Client = new X32Client({
         host: settings.x32Host,
-        port: settings.x32Port
+        port: 10023
       });
 
       this.x32Client.on('error', (error) => {
@@ -105,7 +141,7 @@ export class SceneRecallAction extends SingletonAction<Settings> {
 
       await this.x32Client.connect();
       
-      streamDeck.logger.info(`Connected to X32 at ${settings.x32Host}:${settings.x32Port}`);
+      streamDeck.logger.info(`Connected to X32 at ${settings.x32Host}:10023`);
     } catch (error) {
       streamDeck.logger.error("Failed to connect to X32:", error);
       this.x32Client = null;

@@ -131,12 +131,6 @@ export class ConfigValidator {
       errors.push("Invalid IP address format");
     }
     
-    if (!settings.x32Port) {
-      errors.push("X32 port is required");
-    } else if (!ErrorHandler.isValidPort(settings.x32Port)) {
-      errors.push("Port must be between 1 and 65535");
-    }
-    
     return {
       isValid: errors.length === 0,
       errors

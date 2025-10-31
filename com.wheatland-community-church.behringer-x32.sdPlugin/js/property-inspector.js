@@ -27,6 +27,15 @@ function connectElgatoStreamDeckSocket(inPort, inUuid, inRegisterEvent, inInfo, 
         
         if (message.event === 'didReceiveSettings') {
             loadSettingsFromPayload(message.payload.settings);
+        } else if (message.event === 'sendToPropertyInspector') {
+            // Handle messages from the plugin
+            if (message.payload && message.payload.event === 'connectionTestResult') {
+                if (message.payload.success) {
+                    showStatus('success', message.payload.message || 'Connection successful!');
+                } else {
+                    showStatus('error', message.payload.message || 'Connection failed');
+                }
+            }
         }
     };
 }
@@ -87,11 +96,6 @@ function loadSettingsFromPayload(settings) {
         if (hostInput) hostInput.value = settings.x32Host;
     }
     
-    if (settings.x32Port) {
-        const portInput = document.getElementById('x32Port');
-        if (portInput) portInput.value = settings.x32Port;
-    }
-    
     // Load channel-specific settings
     if (settings.channel) {
         const channelSelect = document.getElementById('channel');
@@ -125,6 +129,17 @@ function loadSettingsFromPayload(settings) {
         if (dcaNameInput) dcaNameInput.value = settings.dcaName;
     }
     
+    // Load mute group-specific settings
+    if (settings.muteGroup) {
+        const muteGroupSelect = document.getElementById('muteGroup');
+        if (muteGroupSelect) muteGroupSelect.value = settings.muteGroup;
+    }
+    
+    if (settings.muteGroupName) {
+        const muteGroupNameInput = document.getElementById('muteGroupName');
+        if (muteGroupNameInput) muteGroupNameInput.value = settings.muteGroupName;
+    }
+    
     // Load fader-specific settings
     if (settings.step) {
         const stepSelect = document.getElementById('step');
@@ -140,11 +155,6 @@ function saveSettings() {
     const hostInput = document.getElementById('x32Host');
     if (hostInput && hostInput.value.trim()) {
         settings.x32Host = hostInput.value.trim();
-    }
-    
-    const portInput = document.getElementById('x32Port');
-    if (portInput && portInput.value) {
-        settings.x32Port = parseInt(portInput.value);
     }
     
     // Get channel settings
@@ -180,6 +190,17 @@ function saveSettings() {
         settings.dcaName = dcaNameInput.value.trim();
     }
     
+    // Get mute group settings
+    const muteGroupSelect = document.getElementById('muteGroup');
+    if (muteGroupSelect && muteGroupSelect.value) {
+        settings.muteGroup = parseInt(muteGroupSelect.value);
+    }
+    
+    const muteGroupNameInput = document.getElementById('muteGroupName');
+    if (muteGroupNameInput && muteGroupNameInput.value.trim()) {
+        settings.muteGroupName = muteGroupNameInput.value.trim();
+    }
+    
     // Get fader settings
     const stepSelect = document.getElementById('step');
     if (stepSelect && stepSelect.value) {
@@ -200,16 +221,14 @@ function saveSettings() {
 // Test X32 connection
 async function testConnection() {
     const hostInput = document.getElementById('x32Host');
-    const portInput = document.getElementById('x32Port');
     const statusDiv = document.getElementById('connectionStatus');
     const statusText = document.getElementById('statusText');
     
-    if (!hostInput || !portInput || !statusDiv || !statusText) {
+    if (!hostInput || !statusDiv || !statusText) {
         return;
     }
     
     const host = hostInput.value.trim();
-    const port = parseInt(portInput.value) || 10023;
     
     if (!host) {
         showStatus('error', 'Please enter an IP address');
@@ -227,8 +246,7 @@ async function testConnection() {
                 "context": uuid,
                 "payload": {
                     "action": "testConnection",
-                    "host": host,
-                    "port": port
+                    "host": host
                 }
             };
             websocket.send(JSON.stringify(message));

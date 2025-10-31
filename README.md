@@ -34,11 +34,12 @@ A comprehensive Stream Deck plugin for controlling Behringer X32 digital mixers 
 ### 1. X32 Mixer Setup
 
 1. Connect your X32 mixer to your network via Ethernet
-2. Configure the mixer's IP address:
-   - Go to **Setup** → **Config** → **Network**
-   - Set a static IP address (e.g., `192.168.1.100`)
+2. Configure the mixer's network settings:
+   - Press **SETUP** button on the X32
+   - Navigate to **Network** tab
+   - Set a static IP address (e.g., `192.168.1.105`)
    - Note the IP address for plugin configuration
-3. Ensure OSC is enabled (usually enabled by default on port 10023)
+3. OSC will now be enabled on port 10023 (default)
 
 ### 2. Plugin Installation
 

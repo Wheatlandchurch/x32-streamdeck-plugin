@@ -47,11 +47,12 @@ The plugin will automatically install into Stream Deck during the build process.
 2. Power on the X32 mixer
 
 ### Step 2: Configure Network Settings
-1. On the X32, navigate to: **Setup** → **Config** → **Network**
-2. Configure network settings:
+1. On the X32, press the **SETUP** button
+2. Navigate to **Network** tab
+3. Configure network settings:
    - **DHCP**: Enable for automatic IP assignment, or
    - **Static IP**: Set manually (recommended for reliability)
-     - IP Address: e.g., `192.168.1.100`
+     - IP Address: e.g., `192.168.1.105`
      - Subnet Mask: e.g., `255.255.255.0`
      - Gateway: Your router's IP (e.g., `192.168.1.1`)
 

@@ -5,9 +5,27 @@ All notable changes to the X32 Stream Deck Plugin will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.2] - 2025-10-31
+
+### Fixed
+- **Scene Recall Command** - Corrected scene recall to use `/load "scene" {number}` command format instead of `/-snap/` commands. X32 properly responds and executes scene changes now
+- **Mute Group Configuration** - Fixed property inspector to properly save and load `muteGroup` and `muteGroupName` settings. Mute group actions now configure correctly
+- **Channel Fader Initialization** - Fixed duplicate query call in channel fader initialization. Now properly queries both fader level and mute status
+- **Status Polling** - Fixed real-time status updates for Channel Mute, DCA Control, and Mute Group actions. Actions now track their instances properly and reflect X32 state changes within 500ms
+- **Action Instance Tracking** - Implemented proper instance tracking using Map storage for SingletonAction classes. Button states now update correctly across all action instances
+
+### Changed
+- Simplified scene recall confirmation prompts since X32 executes scenes immediately (no preview mode)
+- Removed debug logging from production build for cleaner logs
+
 ## [2.0.1] - 2025-10-30
 
 ### Fixed
+- **Critical: Plugin Crash on Startup** - Fixed module type mismatch in `bin/package.json` that caused plugin to crash immediately with exit code 1. Changed from ES module to CommonJS to match build output
+- **Critical: Scene Recall Not Working** - Fixed scene recall commands to use correct X32 snapshot protocol (`/-snap/index` + `/-snap/go` instead of `/scene/go/`). Scenes now use 0-based indexing to match X32
+- **Critical: Socket Not Receiving** - Added `socket.bind()` to enable receiving UDP responses from X32. This fixed mute groups and all status updates
+- **Channel Fader Smoothness** - Implemented 50ms throttling for dial rotation to prevent OSC flooding. UI updates immediately while commands are sent efficiently
+- **Connection Test**: Fixed OSC connection test that was timing out. X32 does not respond to `/xremote` command, so connection test now queries a channel parameter to verify connectivity
 - **Icon Quality**: Regenerated all icons at proper SDK-specified sizes (72x72/@1x, 144x144/@2x for actions; 256x256/@1x, 512x512/@2x for plugin)
 - **Icon Centering**: Fixed centering for plugin icons and mute group icons
 - **Marketplace Media**: Added professional marketplace media assets with proper bullet point rendering

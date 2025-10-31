@@ -1,9 +1,8 @@
-import streamDeck, { action, KeyDownEvent, SingletonAction, WillAppearEvent, WillDisappearEvent } from "@elgato/streamdeck";
+import streamDeck, { action, KeyDownEvent, SendToPluginEvent, SingletonAction, WillAppearEvent, WillDisappearEvent } from "@elgato/streamdeck";
 import { X32Client } from "../x32-client";
 
 type Settings = {
   x32Host?: string;
-  x32Port?: number;
   muteGroup?: number; // Mute group number (1-6)
   muteGroupName?: string; // Display name for the mute group
 };
@@ -12,16 +11,19 @@ type Settings = {
 export class MuteGroupAction extends SingletonAction<Settings> {
   private x32Client: X32Client | null = null;
   private muteGroupActive: boolean = false;
+  private actionInstances: Map<string, any> = new Map(); // Track action instances by context
 
   override async onWillAppear(ev: WillAppearEvent<Settings>): Promise<void> {
     const settings = ev.payload.settings;
+    
+    // Store this action instance
+    this.actionInstances.set(ev.action.id, ev.action);
     
     // Set default values if not configured
     if (!settings.x32Host) {
       await ev.action.setSettings({
         ...settings,
         x32Host: "192.168.1.100",
-        x32Port: 10023,
         muteGroup: 1,
         muteGroupName: "Mute Group 1"
       });
@@ -34,10 +36,52 @@ export class MuteGroupAction extends SingletonAction<Settings> {
   }
 
   override async onWillDisappear(ev: WillDisappearEvent<Settings>): Promise<void> {
+    // Remove this action instance
+    this.actionInstances.delete(ev.action.id);
+    
     if (this.x32Client) {
       const settings = ev.payload.settings;
       if (settings.muteGroup) {
         this.x32Client.unsubscribeFromMuteGroup(settings.muteGroup);
+      }
+    }
+  }
+
+  override async onSendToPlugin(ev: SendToPluginEvent<any, Settings>): Promise<void> {
+    const payload = ev.payload as any;
+    
+    // Handle connection test request from property inspector
+    if (payload.action === 'testConnection') {
+      streamDeck.logger.info(`Testing connection to ${payload.host}:10023`);
+      
+      try {
+        const testClient = new X32Client({
+          host: payload.host,
+          port: 10023
+        });
+
+        await testClient.connect();
+        
+        // Send success message back to property inspector
+        streamDeck.ui.current?.sendToPropertyInspector({
+          event: 'connectionTestResult',
+          success: true,
+          message: `Successfully connected to X32 at ${payload.host}:10023`
+        });
+        
+        streamDeck.logger.info("Connection test successful");
+        
+        // Clean up test client
+        testClient.disconnect();
+      } catch (error) {
+        // Send error message back to property inspector
+        streamDeck.ui.current?.sendToPropertyInspector({
+          event: 'connectionTestResult',
+          success: false,
+          message: `Failed to connect: ${error instanceof Error ? error.message : 'Unknown error'}`
+        });
+        
+        streamDeck.logger.error("Connection test failed:", error);
       }
     }
   }
@@ -74,14 +118,14 @@ export class MuteGroupAction extends SingletonAction<Settings> {
   }
 
   private async connectToX32(settings: Settings): Promise<void> {
-    if (!settings.x32Host || !settings.x32Port) {
+    if (!settings.x32Host) {
       return;
     }
 
     try {
       this.x32Client = new X32Client({
         host: settings.x32Host,
-        port: settings.x32Port
+        port: 10023
       });
 
       this.x32Client.on('error', (error) => {
@@ -130,17 +174,9 @@ export class MuteGroupAction extends SingletonAction<Settings> {
   }
 
   private async updateAllButtonStates(): Promise<void> {
-    // This will update all instances of the mute group action
-    const instances = streamDeck.actions.getActionById("com.wheatland-community-church.behringer-x32.mutegroup");
-    if (instances && Array.isArray(instances)) {
-      for (const instance of instances) {
-        await this.updateButtonState(instance);
-        await this.updateButtonTitle(instance);
-      }
-    } else if (instances) {
-      // Single instance
-      await this.updateButtonState(instances);
-      await this.updateButtonTitle(instances);
+    for (const [id, action] of this.actionInstances) {
+      await this.updateButtonState(action);
+      await this.updateButtonTitle(action);
     }
   }
 }

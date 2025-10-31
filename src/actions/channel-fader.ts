@@ -1,9 +1,8 @@
-import streamDeck, { action, KeyDownEvent, SingletonAction, WillAppearEvent, DialRotateEvent, TouchTapEvent, DialDownEvent, DialUpEvent } from "@elgato/streamdeck";
+import streamDeck, { action, KeyDownEvent, SendToPluginEvent, SingletonAction, WillAppearEvent, DialRotateEvent, TouchTapEvent, DialDownEvent, DialUpEvent } from "@elgato/streamdeck";
 import { X32Client } from "../x32-client";
 
 type Settings = {
   x32Host?: string;
-  x32Port?: number;
   channel?: number;
   step?: number; // Step size for fader adjustments (0.01 to 0.1)
   fineStep?: number; // Fine step size when holding dial (0.001 to 0.01)
@@ -16,6 +15,10 @@ export class ChannelFaderAction extends SingletonAction<Settings> {
   private currentLevel: number = 0;
   private isDialPressed: boolean = false;
   private channelMuted: boolean = false;
+  private pendingFaderUpdate: number | null = null;
+  private faderUpdateTimer: NodeJS.Timeout | null = null;
+  private readonly FADER_UPDATE_DELAY = 50; // milliseconds - smooth but not overwhelming
+  private levelInitialized: boolean = false; // Track if we've received initial level from X32
 
   override async onWillAppear(ev: WillAppearEvent<Settings>): Promise<void> {
     const settings = ev.payload.settings;
@@ -25,7 +28,6 @@ export class ChannelFaderAction extends SingletonAction<Settings> {
       await ev.action.setSettings({
         ...settings,
         x32Host: "192.168.1.100",
-        x32Port: 10023,
         channel: 1,
         step: 0.05,
         fineStep: 0.01,
@@ -83,6 +85,12 @@ export class ChannelFaderAction extends SingletonAction<Settings> {
       return;
     }
 
+    // Don't allow fader adjustment until we've received initial level from X32
+    if (!this.levelInitialized) {
+      streamDeck.logger.warn("Waiting for initial fader level from X32...");
+      return;
+    }
+
     try {
       // Use fine step when dial is pressed AND dialPressAction is 'fine'
       const useFineStep = this.isDialPressed && (settings.dialPressAction === 'fine');
@@ -90,12 +98,26 @@ export class ChannelFaderAction extends SingletonAction<Settings> {
       const ticks = ev.payload.ticks;
       const newLevel = Math.max(0, Math.min(1, this.currentLevel + (ticks * stepSize)));
       
-      await this.x32Client.setChannelFader(settings.channel, newLevel);
+      // Store the pending level
+      this.pendingFaderUpdate = newLevel;
       this.currentLevel = newLevel;
-      await this.updateButtonTitle(ev.action);
       
-      // Update the dial indicator
+      // Update UI immediately for responsiveness
+      await this.updateButtonTitle(ev.action);
       await this.updateDialFeedback(ev.action);
+      
+      // Throttle the actual OSC commands to avoid flooding
+      if (this.faderUpdateTimer) {
+        clearTimeout(this.faderUpdateTimer);
+      }
+      
+      this.faderUpdateTimer = setTimeout(async () => {
+        if (this.pendingFaderUpdate !== null && settings.channel) {
+          await this.x32Client!.setChannelFader(settings.channel, this.pendingFaderUpdate);
+          this.pendingFaderUpdate = null;
+        }
+      }, this.FADER_UPDATE_DELAY);
+      
     } catch (error) {
       streamDeck.logger.error("Failed to adjust fader level:", error);
       await ev.action.showAlert();
@@ -185,15 +207,54 @@ export class ChannelFaderAction extends SingletonAction<Settings> {
     }
   }
 
+  override async onSendToPlugin(ev: SendToPluginEvent<any, Settings>): Promise<void> {
+    const payload = ev.payload as any;
+    
+    // Handle connection test request from property inspector
+    if (payload.action === 'testConnection') {
+      streamDeck.logger.info(`Testing connection to ${payload.host}:10023`);
+      
+      try {
+        const testClient = new X32Client({
+          host: payload.host,
+          port: 10023
+        });
+
+        await testClient.connect();
+        
+        // Send success message back to property inspector
+        streamDeck.ui.current?.sendToPropertyInspector({
+          event: 'connectionTestResult',
+          success: true,
+          message: `Successfully connected to X32 at ${payload.host}:10023`
+        });
+        
+        streamDeck.logger.info("Connection test successful");
+        
+        // Clean up test client
+        testClient.disconnect();
+      } catch (error) {
+        // Send error message back to property inspector
+        streamDeck.ui.current?.sendToPropertyInspector({
+          event: 'connectionTestResult',
+          success: false,
+          message: `Failed to connect: ${error instanceof Error ? error.message : 'Unknown error'}`
+        });
+        
+        streamDeck.logger.error("Connection test failed:", error);
+      }
+    }
+  }
+
   private async connectToX32(settings: Settings): Promise<void> {
-    if (!settings.x32Host || !settings.x32Port) {
+    if (!settings.x32Host) {
       return;
     }
 
     try {
       this.x32Client = new X32Client({
         host: settings.x32Host,
-        port: settings.x32Port
+        port: 10023
       });
 
       this.x32Client.on('error', (error) => {
@@ -213,7 +274,7 @@ export class ChannelFaderAction extends SingletonAction<Settings> {
         await this.x32Client.getChannelMuteStatus(settings.channel);
       }
       
-      streamDeck.logger.info(`Connected to X32 at ${settings.x32Host}:${settings.x32Port}`);
+      streamDeck.logger.info(`Connected to X32 at ${settings.x32Host}:10023`);
     } catch (error) {
       streamDeck.logger.error("Failed to connect to X32:", error);
       this.x32Client = null;
@@ -228,6 +289,7 @@ export class ChannelFaderAction extends SingletonAction<Settings> {
     
     if (msg.address === channelFaderAddress && msg.args.length > 0) {
       this.currentLevel = parseFloat(msg.args[0]);
+      this.levelInitialized = true; // Mark that we've received initial level
       // Update all instances of this action
       this.updateAllButtonTitles();
     } else if (msg.address === channelMuteAddress && msg.args.length > 0) {
