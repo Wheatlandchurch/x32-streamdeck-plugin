@@ -10,15 +10,25 @@ type Settings = {
 @action({ UUID: "com.wheatland-community-church.behringer-x32.mutegroup" })
 export class MuteGroupAction extends SingletonAction<Settings> {
   private x32Client: X32Client | null = null;
-  private muteGroupActive: boolean = false;
-  private actionInstances: Map<string, any> = new Map(); // Track action instances by context
+  private connectedHost: string | null = null;
+
+  // Keep per-context state (since this is a SingletonAction, multiple keys can exist simultaneously)
+  private contextStates: Map<
+    string,
+    {
+      action: any;
+      host: string;
+      muteGroup: number;
+    }
+  > = new Map();
+
+  // Track the current state per mute group so we don't mix state between buttons
+  private muteGroupStates: Map<number, { active: boolean }> = new Map();
+  private subscribedGroups: Set<number> = new Set();
 
   override async onWillAppear(ev: WillAppearEvent<Settings>): Promise<void> {
     const settings = ev.payload.settings;
-    
-    // Store this action instance
-    this.actionInstances.set(ev.action.id, ev.action);
-    
+
     // Set default values if not configured
     if (!settings.x32Host) {
       await ev.action.setSettings({
@@ -30,20 +40,39 @@ export class MuteGroupAction extends SingletonAction<Settings> {
     }
 
     const currentSettings = await ev.action.getSettings();
-    await this.connectToX32(currentSettings);
-    await this.updateButtonState(ev.action);
-    await this.updateButtonTitle(ev.action);
+    const host = currentSettings.x32Host!;
+    const muteGroup = currentSettings.muteGroup ?? 1;
+
+    // Track this action instance for updates
+    const contextId = ev.action.id;
+    this.contextStates.set(contextId, {
+      action: ev.action,
+      host,
+      muteGroup
+    });
+
+    await this.ensureConnected(host);
+    await this.subscribeToMuteGroup(muteGroup);
+    await this.requestMuteGroupState(muteGroup);
+    await this.updateButtonForContext(contextId);
   }
 
   override async onWillDisappear(ev: WillDisappearEvent<Settings>): Promise<void> {
-    // Remove this action instance
-    this.actionInstances.delete(ev.action.id);
-    
-    if (this.x32Client) {
-      const settings = ev.payload.settings;
-      if (settings.muteGroup) {
-        this.x32Client.unsubscribeFromMuteGroup(settings.muteGroup);
-      }
+    const contextId = ev.action.id;
+    const contextState = this.contextStates.get(contextId);
+    this.contextStates.delete(contextId);
+
+    if (!contextState) {
+      return;
+    }
+
+    const { muteGroup } = contextState;
+
+    // If no remaining context uses this mute group, unsubscribe and clear cached state
+    if (![...this.contextStates.values()].some(cs => cs.muteGroup === muteGroup)) {
+      this.subscribedGroups.delete(muteGroup);
+      this.x32Client?.unsubscribeFromMuteGroup(muteGroup);
+      this.muteGroupStates.delete(muteGroup);
     }
   }
 
@@ -87,96 +116,131 @@ export class MuteGroupAction extends SingletonAction<Settings> {
   }
 
   override async onKeyDown(ev: KeyDownEvent<Settings>): Promise<void> {
-    const settings = ev.payload.settings;
-    
-    if (!this.x32Client || !this.x32Client.isConnected()) {
-      await this.connectToX32(settings);
-      if (!this.x32Client || !this.x32Client.isConnected()) {
-        streamDeck.logger.error("Failed to connect to X32");
-        await ev.action.showAlert();
-        return;
-      }
-    }
+    const contextId = ev.action.id;
+    const contextState = this.contextStates.get(contextId);
 
-    if (!settings.muteGroup) {
-      streamDeck.logger.error("Mute group not configured");
+    if (!contextState) {
+      streamDeck.logger.error("Missing context state for mute group action");
       await ev.action.showAlert();
       return;
     }
 
+    const { host, muteGroup } = contextState;
+
+    await this.ensureConnected(host);
+    if (!this.x32Client || !this.x32Client.isConnected()) {
+      streamDeck.logger.error("Failed to connect to X32");
+      await ev.action.showAlert();
+      return;
+    }
+
+    const state = this.getMuteGroupState(muteGroup);
+    state.active = !state.active;
+
     try {
-      // Toggle mute group state
-      this.muteGroupActive = !this.muteGroupActive;
-      await this.x32Client.setMuteGroup(settings.muteGroup, this.muteGroupActive);
-      await this.updateButtonState(ev.action);
-      await this.updateButtonTitle(ev.action);
+      await this.x32Client.setMuteGroup(muteGroup, state.active);
+      await this.updateButtonForContext(contextId);
       await ev.action.showOk();
+
+      streamDeck.logger.info(`Mute Group ${muteGroup} ${state.active ? 'active' : 'inactive'}`);
     } catch (error) {
       streamDeck.logger.error("Failed to toggle mute group:", error);
       await ev.action.showAlert();
     }
   }
 
-  private async connectToX32(settings: Settings): Promise<void> {
-    if (!settings.x32Host) {
+  private async ensureConnected(host: string): Promise<void> {
+    if (this.x32Client && this.connectedHost === host && this.x32Client.isConnected()) {
       return;
+    }
+
+    if (this.x32Client) {
+      this.x32Client.disconnect();
+      this.x32Client = null;
+      this.connectedHost = null;
     }
 
     try {
       this.x32Client = new X32Client({
-        host: settings.x32Host,
+        host,
         port: 10023
       });
+
+      this.connectedHost = host;
 
       this.x32Client.on('error', (error) => {
         streamDeck.logger.error("X32 Client error:", error);
       });
 
       this.x32Client.on('message', (msg) => {
-        this.handleX32Message(msg, settings);
+        this.handleX32Message(msg);
       });
 
       await this.x32Client.connect();
-      
-      if (settings.muteGroup) {
-        this.x32Client.subscribeToMuteGroup(settings.muteGroup);
-        await this.x32Client.getMuteGroupState(settings.muteGroup);
+      streamDeck.logger.info(`Connected to X32 at ${host}:10023`);
+
+      // Re-subscribe to any mute groups we were previously tracking
+      for (const group of this.subscribedGroups) {
+        await this.x32Client.subscribeToMuteGroup(group);
+        await this.requestMuteGroupState(group);
       }
     } catch (error) {
       streamDeck.logger.error("Failed to connect to X32:", error);
       this.x32Client = null;
+      this.connectedHost = null;
     }
   }
 
-  private handleX32Message(msg: any, settings: Settings): void {
+  private handleX32Message(msg: any): void {
     const { address, args } = msg;
-    
-    if (settings.muteGroup && address === `/config/mute/${settings.muteGroup}`) {
-      if (args && args.length > 0) {
-        const newState = args[0] === 1;
-        if (newState !== this.muteGroupActive) {
-          this.muteGroupActive = newState;
-          this.updateAllButtonStates();
-        }
+    const match = address.match(/^\/config\/mute\/(\d+)$/);
+    if (!match || !args || args.length === 0) {
+      return;
+    }
+
+    const group = parseInt(match[1], 10);
+    const active = args[0] === 1;
+    const state = this.getMuteGroupState(group);
+    state.active = active;
+
+    for (const [contextId, contextState] of this.contextStates.entries()) {
+      if (contextState.muteGroup === group) {
+        this.updateButtonForContext(contextId).catch((error) => {
+          streamDeck.logger.error("Failed to update mute group button state:", error);
+        });
       }
     }
   }
 
-  private async updateButtonState(action: any): Promise<void> {
-    await action.setState(this.muteGroupActive ? 1 : 0);
+  private getMuteGroupState(group: number) {
+    if (!this.muteGroupStates.has(group)) {
+      this.muteGroupStates.set(group, { active: false });
+    }
+    return this.muteGroupStates.get(group)!;
   }
 
-  private async updateButtonTitle(action: any): Promise<void> {
+  private async updateButtonForContext(contextId: string): Promise<void> {
+    const contextState = this.contextStates.get(contextId);
+    if (!contextState) return;
+
+    const state = this.getMuteGroupState(contextState.muteGroup);
+    const settings = await contextState.action.getSettings();
+    const groupName = settings.muteGroupName || `Mute Group ${contextState.muteGroup}`;
+    const status = state.active ? "ACTIVE" : "INACTIVE";
+
+    await contextState.action.setState(state.active ? 1 : 0);
+    await contextState.action.setTitle(`${groupName}\n${status}`);
+  }
+
+  /* private async updateButtonTitle(action: any): Promise<void> {
     const settings = await action.getSettings();
     const groupName = settings.muteGroupName || `Mute Group ${settings.muteGroup || '?'}`;
     const status = this.muteGroupActive ? "ACTIVE" : "INACTIVE";
     await action.setTitle(`${groupName}\\n${status}`);
-  }
+  } */
 
-  private async updateAllButtonStates(): Promise<void> {
-    for (const [id, action] of this.actionInstances) {
-      await this.updateButtonState(action);
-      await this.updateButtonTitle(action);
+}
+
     }
   }
 }

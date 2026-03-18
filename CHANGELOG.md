@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Channel Fader Initialization** - Fixed duplicate query call in channel fader initialization. Now properly queries both fader level and mute status
 - **Status Polling** - Fixed real-time status updates for Channel Mute, DCA Control, and Mute Group actions. Actions now track their instances properly and reflect X32 state changes within 500ms
 - **Action Instance Tracking** - Implemented proper instance tracking using Map storage for SingletonAction classes. Button states now update correctly across all action instances
+- **Isolated Action State** - Fixed an issue where multiple instances of the same action could interfere with each other (e.g., muting one channel would affect another). Each action now tracks its own device state per channel/DCA/mute group.
 
 ### Changed
 - Simplified scene recall confirmation prompts since X32 executes scenes immediately (no preview mode)
