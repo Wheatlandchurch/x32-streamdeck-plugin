@@ -5,6 +5,22 @@ All notable changes to the X32 Stream Deck Plugin will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.5] - 2026-03-20
+
+### Fixed ⭐ Critical Architecture Fix
+- **Multiple X32 Mixer Support**: Fixed fundamental SingletonAction architecture issue that prevented controlling multiple X32 mixers simultaneously. Plugin now maintains separate connections and state for each X32 mixer on the network
+- **Per-Host Connection Management**: Refactored all actions (Channel Mute, Channel Fader, DCA Control, Mute Group, Scene Recall) to support independent connections to different X32 mixers
+- **State Isolation**: Implemented per-host state management to prevent cross-contamination between different mixers. Channel states, DCA states, and mute group states are now properly isolated by host IP
+- **Consistent Button Behavior**: Fixed inconsistent button updates where pressing one button would incorrectly update buttons configured for different channels or mixers
+- **Channel Fader Functionality**: Restored full channel fader functionality by fixing connection stability and state management issues
+- **Correct Mute Status Display**: Fixed reversed or incorrect mute status indicators on buttons by ensuring proper state synchronization with the correct mixer
+- **Reliable Command Execution**: Commands now reliably execute on the correct mixer based on button configuration, eliminating "wrong channel" operations
+
+### Changed
+- **Connection Architecture**: Actions now use `Map<string, X32Client>` for per-host connections instead of shared single connection
+- **State Management**: All state tracking (channelMuteStates, dcaStates, channelStates) now keyed by host IP to prevent interference
+- **Context Handling**: Improved context state management to properly associate buttons with their configured mixer hosts
+
 ## [2.0.2] - 2025-10-31
 
 ### Fixed
@@ -13,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Channel Fader Initialization** - Fixed duplicate query call in channel fader initialization. Now properly queries both fader level and mute status
 - **Status Polling** - Fixed real-time status updates for Channel Mute, DCA Control, and Mute Group actions. Actions now track their instances properly and reflect X32 state changes within 500ms
 - **Action Instance Tracking** - Implemented proper instance tracking using Map storage for SingletonAction classes. Button states now update correctly across all action instances
+- **Isolated Action State** - Fixed an issue where multiple instances of the same action could interfere with each other (e.g., muting one channel would affect another). Each action now tracks its own device state per channel/DCA/mute group.
 
 ### Changed
 - Simplified scene recall confirmation prompts since X32 executes scenes immediately (no preview mode)

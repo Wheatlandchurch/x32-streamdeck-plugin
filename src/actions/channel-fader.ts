@@ -11,18 +11,36 @@ type Settings = {
 
 @action({ UUID: "com.wheatland-community-church.behringer-x32.fader" })
 export class ChannelFaderAction extends SingletonAction<Settings> {
-  private x32Client: X32Client | null = null;
-  private currentLevel: number = 0;
-  private isDialPressed: boolean = false;
-  private channelMuted: boolean = false;
-  private pendingFaderUpdate: number | null = null;
-  private faderUpdateTimer: NodeJS.Timeout | null = null;
+  // Support multiple X32 connections (one per host)
+  private x32Clients: Map<string, X32Client> = new Map();
+  private hostSubscriptions: Map<string, Set<number>> = new Map();
+
+  // Track per-context state to support multiple keys using different channels
+  private contextStates: Map<
+    string,
+    {
+      action: any;
+      host: string;
+      channel: number;
+      isDialPressed: boolean;
+    }
+  > = new Map();
+
+  // Track per-channel X32 state so multiple contexts sharing the same channel stay in sync
+  private channelStates: Map<string, Map<number, {
+    level: number;
+    muted: boolean;
+    initialized: boolean;
+    pendingFaderUpdate: number | null;
+    faderUpdateTimer: NodeJS.Timeout | null;
+  }>> = new Map();
+
   private readonly FADER_UPDATE_DELAY = 50; // milliseconds - smooth but not overwhelming
-  private levelInitialized: boolean = false; // Track if we've received initial level from X32
+  private subscribedChannels: Set<number> = new Set();
 
   override async onWillAppear(ev: WillAppearEvent<Settings>): Promise<void> {
     const settings = ev.payload.settings;
-    
+
     // Set default values if not configured
     if (!settings.x32Host) {
       await ev.action.setSettings({
@@ -36,35 +54,57 @@ export class ChannelFaderAction extends SingletonAction<Settings> {
     }
 
     const currentSettings = await ev.action.getSettings();
-    await this.connectToX32(currentSettings);
-    await this.updateButtonTitle(ev.action);
-    await this.updateDialFeedback(ev.action);
+    const host = currentSettings.x32Host!;
+    const channel = currentSettings.channel ?? 1;
+
+    // Track this action instance for updates
+    const contextId = ev.action.id;
+    this.contextStates.set(contextId, {
+      action: ev.action,
+      host,
+      channel,
+      isDialPressed: false
+    });
+
+    await this.ensureConnected(host);
+    await this.subscribeToChannel(host, channel);
+    await this.requestChannelState(host, channel);
+
+    // Ensure UI reflects the latest known state (may be initialized via polling)
+    await this.updateButtonTitleForContext(contextId);
+    await this.updateDialFeedbackForContext(contextId);
   }
 
   override async onKeyDown(ev: KeyDownEvent<Settings>): Promise<void> {
-    const settings = ev.payload.settings;
-    
-    if (!this.x32Client || !this.x32Client.isConnected()) {
-      await this.connectToX32(settings);
-      if (!this.x32Client || !this.x32Client.isConnected()) {
-        streamDeck.logger.error("Failed to connect to X32");
-        await ev.action.showAlert();
-        return;
-      }
-    }
+    const contextId = ev.action.id;
+    const contextState = this.contextStates.get(contextId);
 
-    if (!settings.channel) {
-      streamDeck.logger.error("Channel not configured");
+    if (!contextState) {
+      streamDeck.logger.error("Missing context state for fader action");
       await ev.action.showAlert();
       return;
     }
 
+    const { host, channel } = contextState;
+
+    const client = await this.ensureConnected(host);
+    if (!client || !client.isConnected()) {
+      streamDeck.logger.error("Failed to connect to X32");
+      await ev.action.showAlert();
+      return;
+    }
+
+    // On key press, reset fader to unity (0.75 in X32 terms, which is 0dB)
+    const unityLevel = 0.75;
+
     try {
-      // On key press, reset fader to unity (0.75 in X32 terms, which is 0dB)
-      const unityLevel = 0.75;
-      await this.x32Client.setChannelFader(settings.channel, unityLevel);
-      this.currentLevel = unityLevel;
-      await this.updateButtonTitle(ev.action);
+      await client.setChannelFader(channel, unityLevel);
+      const channelState = this.getChannelState(host, channel);
+      channelState.level = unityLevel;
+      channelState.initialized = true;
+
+      await this.updateButtonTitleForContext(contextId);
+      await this.updateDialFeedbackForContext(contextId);
       await ev.action.showOk();
     } catch (error) {
       streamDeck.logger.error("Failed to set fader level:", error);
@@ -73,51 +113,55 @@ export class ChannelFaderAction extends SingletonAction<Settings> {
   }
 
   override async onDialRotate(ev: DialRotateEvent<Settings>): Promise<void> {
-    const settings = ev.payload.settings;
-    
-    if (!this.x32Client || !this.x32Client.isConnected()) {
+    const contextId = ev.action.id;
+    const contextState = this.contextStates.get(contextId);
+
+    if (!contextState) {
+      streamDeck.logger.error("Missing context state for fader action");
+      return;
+    }
+
+    const { host, channel } = contextState;
+
+    const client = this.x32Clients.get(host);
+    if (!client || !client.isConnected()) {
       await ev.action.showAlert();
       return;
     }
 
-    if (!settings.channel) {
-      await ev.action.showAlert();
-      return;
-    }
-
-    // Don't allow fader adjustment until we've received initial level from X32
-    if (!this.levelInitialized) {
+    const channelState = this.getChannelState(host, channel);
+    if (!channelState.initialized) {
       streamDeck.logger.warn("Waiting for initial fader level from X32...");
       return;
     }
 
     try {
       // Use fine step when dial is pressed AND dialPressAction is 'fine'
-      const useFineStep = this.isDialPressed && (settings.dialPressAction === 'fine');
-      const stepSize = useFineStep ? (settings.fineStep || 0.01) : (settings.step || 0.05);
+      const useFineStep = contextState.isDialPressed && (ev.payload.settings.dialPressAction === 'fine');
+      const stepSize = useFineStep ? (ev.payload.settings.fineStep || 0.01) : (ev.payload.settings.step || 0.05);
       const ticks = ev.payload.ticks;
-      const newLevel = Math.max(0, Math.min(1, this.currentLevel + (ticks * stepSize)));
-      
+      const newLevel = Math.max(0, Math.min(1, channelState.level + (ticks * stepSize)));
+
       // Store the pending level
-      this.pendingFaderUpdate = newLevel;
-      this.currentLevel = newLevel;
-      
+      channelState.pendingFaderUpdate = newLevel;
+      channelState.level = newLevel;
+
       // Update UI immediately for responsiveness
-      await this.updateButtonTitle(ev.action);
-      await this.updateDialFeedback(ev.action);
-      
+      await this.updateButtonTitleForContext(contextId);
+      await this.updateDialFeedbackForContext(contextId);
+
       // Throttle the actual OSC commands to avoid flooding
-      if (this.faderUpdateTimer) {
-        clearTimeout(this.faderUpdateTimer);
+      if (channelState.faderUpdateTimer) {
+        clearTimeout(channelState.faderUpdateTimer);
       }
-      
-      this.faderUpdateTimer = setTimeout(async () => {
-        if (this.pendingFaderUpdate !== null && settings.channel) {
-          await this.x32Client!.setChannelFader(settings.channel, this.pendingFaderUpdate);
-          this.pendingFaderUpdate = null;
+
+      channelState.faderUpdateTimer = setTimeout(async () => {
+        if (channelState.pendingFaderUpdate !== null) {
+          await client.setChannelFader(channel, channelState.pendingFaderUpdate);
+          channelState.pendingFaderUpdate = null;
         }
       }, this.FADER_UPDATE_DELAY);
-      
+
     } catch (error) {
       streamDeck.logger.error("Failed to adjust fader level:", error);
       await ev.action.showAlert();
@@ -125,25 +169,34 @@ export class ChannelFaderAction extends SingletonAction<Settings> {
   }
 
   override async onTouchTap(ev: TouchTapEvent<Settings>): Promise<void> {
-    const settings = ev.payload.settings;
-    
-    if (!this.x32Client || !this.x32Client.isConnected()) {
+    const contextId = ev.action.id;
+    const contextState = this.contextStates.get(contextId);
+
+    if (!contextState) {
+      streamDeck.logger.error("Missing context state for fader action");
       return;
     }
 
-    if (!settings.channel) {
+    const { host, channel } = contextState;
+
+    const client = this.x32Clients.get(host);
+    if (!client || !client.isConnected()) {
       return;
     }
 
     try {
+      const channelState = this.getChannelState(host, channel);
+
       // Toggle between current level and unity (0dB)
       const unityLevel = 0.75;
-      const newLevel = Math.abs(this.currentLevel - unityLevel) < 0.01 ? 0 : unityLevel;
-      
-      await this.x32Client.setChannelFader(settings.channel, newLevel);
-      this.currentLevel = newLevel;
-      await this.updateButtonTitle(ev.action);
-      await this.updateDialFeedback(ev.action);
+      const newLevel = Math.abs(channelState.level - unityLevel) < 0.01 ? 0 : unityLevel;
+
+      await client.setChannelFader(channel, newLevel);
+      channelState.level = newLevel;
+      channelState.initialized = true;
+
+      await this.updateButtonTitleForContext(contextId);
+      await this.updateDialFeedbackForContext(contextId);
     } catch (error) {
       streamDeck.logger.error("Failed to set fader level:", error);
       await ev.action.showAlert();
@@ -151,41 +204,47 @@ export class ChannelFaderAction extends SingletonAction<Settings> {
   }
 
   override async onDialDown(ev: DialDownEvent<Settings>): Promise<void> {
-    const settings = ev.payload.settings;
-    this.isDialPressed = true;
-    
-    if (!this.x32Client || !this.x32Client.isConnected()) {
-      await ev.action.showAlert();
+    const contextId = ev.action.id;
+    const contextState = this.contextStates.get(contextId);
+
+    if (!contextState) {
+      streamDeck.logger.error("Missing context state for fader action");
       return;
     }
 
-    if (!settings.channel) {
+    contextState.isDialPressed = true;
+
+    const { host, channel } = contextState;
+    const client = this.x32Clients.get(host);
+    if (!client || !client.isConnected()) {
       await ev.action.showAlert();
       return;
     }
 
     try {
-      const dialAction = settings.dialPressAction || 'mute';
-      
+      const dialAction = ev.payload.settings.dialPressAction || 'mute';
+      const channelState = this.getChannelState(host, channel);
+
       switch (dialAction) {
         case 'mute':
           // Toggle mute/unmute
-          this.channelMuted = !this.channelMuted;
-          await this.x32Client.muteChannel(settings.channel, this.channelMuted);
-          await this.updateButtonTitle(ev.action);
-          streamDeck.logger.info(`Channel ${settings.channel} ${this.channelMuted ? 'muted' : 'unmuted'}`);
+          channelState.muted = !channelState.muted;
+          await client.muteChannel(channel, channelState.muted);
+          await this.updateButtonTitleForContext(contextId);
+          streamDeck.logger.info(`Channel ${channel} ${channelState.muted ? 'muted' : 'unmuted'}`);
           break;
-          
+
         case 'unity':
           // Set to unity (0dB)
           const unityLevel = 0.75;
-          await this.x32Client.setChannelFader(settings.channel, unityLevel);
-          this.currentLevel = unityLevel;
-          await this.updateButtonTitle(ev.action);
-          await this.updateDialFeedback(ev.action);
-          streamDeck.logger.info(`Channel ${settings.channel} set to unity (0dB)`);
+          channelState.level = unityLevel;
+          channelState.initialized = true;
+          await client.setChannelFader(channel, unityLevel);
+          await this.updateButtonTitleForContext(contextId);
+          await this.updateDialFeedbackForContext(contextId);
+          streamDeck.logger.info(`Channel ${channel} set to unity (0dB)`);
           break;
-          
+
         case 'fine':
           // Enable fine adjustment mode (handled in onDialRotate)
           streamDeck.logger.info("Fine adjustment mode enabled");
@@ -198,10 +257,16 @@ export class ChannelFaderAction extends SingletonAction<Settings> {
   }
 
   override async onDialUp(ev: DialUpEvent<Settings>): Promise<void> {
-    const settings = ev.payload.settings;
-    this.isDialPressed = false;
-    
-    const dialAction = settings.dialPressAction || 'mute';
+    const contextId = ev.action.id;
+    const contextState = this.contextStates.get(contextId);
+
+    if (!contextState) {
+      return;
+    }
+
+    contextState.isDialPressed = false;
+
+    const dialAction = ev.payload.settings.dialPressAction || 'mute';
     if (dialAction === 'fine') {
       streamDeck.logger.info("Fine adjustment mode disabled");
     }
@@ -246,94 +311,158 @@ export class ChannelFaderAction extends SingletonAction<Settings> {
     }
   }
 
-  private async connectToX32(settings: Settings): Promise<void> {
-    if (!settings.x32Host) {
-      return;
+  private async ensureConnected(host: string): Promise<X32Client> {
+    if (this.x32Clients.has(host)) {
+      const client = this.x32Clients.get(host)!;
+      if (client.isConnected()) {
+        return client;
+      }
+      // Client exists but not connected, remove it
+      client.disconnect();
+      this.x32Clients.delete(host);
     }
 
     try {
-      this.x32Client = new X32Client({
-        host: settings.x32Host,
+      const client = new X32Client({
+        host,
         port: 10023
       });
 
-      this.x32Client.on('error', (error) => {
-        streamDeck.logger.error("X32 Client error:", error);
+      client.on('error', (error) => {
+        streamDeck.logger.error(`X32 Client error for ${host}:`, error);
       });
 
-      this.x32Client.on('message', (msg) => {
-        this.handleX32Message(msg, settings);
+      client.on('message', (msg) => {
+        this.handleX32Message(msg, host);
       });
 
-      await this.x32Client.connect();
+      await client.connect();
+      this.x32Clients.set(host, client);
       
-      if (settings.channel) {
-        this.x32Client.subscribeToChannel(settings.channel);
-        // Request initial fader level and mute status
-        await this.x32Client.getChannelFaderLevel(settings.channel);
-        await this.x32Client.getChannelMuteStatus(settings.channel);
+      // Re-subscribe to any channels we were previously tracking for this host
+      const hostChannels = this.hostSubscriptions.get(host) || new Set();
+      for (const channel of hostChannels) {
+        client.subscribeToChannel(channel);
+        client.getChannelMuteStatus(channel).catch(() => {});
+        client.getChannelFaderLevel(channel).catch(() => {});
       }
-      
-      streamDeck.logger.info(`Connected to X32 at ${settings.x32Host}:10023`);
+
+      streamDeck.logger.info(`Connected to X32 at ${host}:10023`);
+      return client;
     } catch (error) {
-      streamDeck.logger.error("Failed to connect to X32:", error);
-      this.x32Client = null;
+      streamDeck.logger.error(`Failed to connect to X32 at ${host}:`, error);
+      throw error;
     }
   }
 
-  private handleX32Message(msg: { address: string; args: any[] }, settings: Settings): void {
-    if (!settings.channel) return;
+  private async subscribeToChannel(host: string, channel: number): Promise<void> {
+    const client = this.x32Clients.get(host);
+    if (!client || !client.isConnected()) return;
 
-    const channelFaderAddress = `/ch/${settings.channel.toString().padStart(2, '0')}/mix/fader`;
-    const channelMuteAddress = `/ch/${settings.channel.toString().padStart(2, '0')}/mix/on`;
-    
-    if (msg.address === channelFaderAddress && msg.args.length > 0) {
-      this.currentLevel = parseFloat(msg.args[0]);
-      this.levelInitialized = true; // Mark that we've received initial level
-      // Update all instances of this action
-      this.updateAllButtonTitles();
-    } else if (msg.address === channelMuteAddress && msg.args.length > 0) {
-      // X32 sends 1 for unmuted, 0 for muted
-      this.channelMuted = msg.args[0] === 0;
-      // Update all instances of this action
-      this.updateAllButtonTitles();
+    const hostChannels = this.hostSubscriptions.get(host) || new Set();
+    if (hostChannels.has(channel)) return;
+
+    hostChannels.add(channel);
+    this.hostSubscriptions.set(host, hostChannels);
+    client.subscribeToChannel(channel);
+  }
+
+  private async requestChannelState(host: string, channel: number): Promise<void> {
+    const client = this.x32Clients.get(host);
+    if (!client || !client.isConnected()) return;
+    await client.getChannelFaderLevel(channel);
+    await client.getChannelMuteStatus(channel);
+  }
+
+  private handleX32Message(msg: { address: string; args: any[] }, host: string): void {
+    // Handle fader level updates
+    const faderMatch = msg.address.match(/^\/ch\/(\d{2})\/mix\/fader$/);
+    if (faderMatch && msg.args.length > 0) {
+      const channel = parseInt(faderMatch[1], 10);
+      const level = parseFloat(msg.args[0]);
+      const state = this.getChannelState(host, channel);
+      state.level = level;
+      state.initialized = true;
+
+      // Update any contexts that care about this channel on this host
+      for (const [contextId, contextState] of this.contextStates.entries()) {
+        if (contextState.host === host && contextState.channel === channel) {
+          this.updateButtonTitleForContext(contextId).catch((error) => {
+            streamDeck.logger.error("Failed to update button title:", error);
+          });
+          this.updateDialFeedbackForContext(contextId).catch((error) => {
+            streamDeck.logger.error("Failed to update dial feedback:", error);
+          });
+        }
+      }
+
+      return;
+    }
+
+    // Handle mute state updates
+    const muteMatch = msg.address.match(/^\/ch\/(\d{2})\/mix\/on$/);
+    if (muteMatch && msg.args.length > 0) {
+      const channel = parseInt(muteMatch[1], 10);
+      const isOn = msg.args[0] === 1;
+      const state = this.getChannelState(host, channel);
+      state.muted = !isOn;
+
+      for (const [contextId, contextState] of this.contextStates.entries()) {
+        if (contextState.host === host && contextState.channel === channel) {
+          this.updateButtonTitleForContext(contextId).catch((error) => {
+            streamDeck.logger.error("Failed to update button title:", error);
+          });
+        }
+      }
     }
   }
 
-  private async updateButtonTitle(action: any): Promise<void> {
-    const settings = await action.getSettings();
-    const dBLevel = this.levelToDb(this.currentLevel);
-    const muteStatus = this.channelMuted ? " (MUTED)" : "";
-    const title = `Ch${settings.channel || '?'}\\n${dBLevel}dB${muteStatus}`;
-    await action.setTitle(title);
+
+
+
+
+  private getChannelState(host: string, channel: number) {
+    const hostStates = this.channelStates.get(host) || new Map();
+    if (!hostStates.has(channel)) {
+      hostStates.set(channel, {
+        level: 0,
+        muted: false,
+        initialized: false,
+        pendingFaderUpdate: null,
+        faderUpdateTimer: null
+      });
+      this.channelStates.set(host, hostStates);
+    }
+
+    return hostStates.get(channel)!;
   }
 
-  private async updateDialFeedback(action: any): Promise<void> {
-    // Set dial feedback to show current fader level (0-100%)
-    const percentage = Math.round(this.currentLevel * 100);
-    
-    // Use setFeedback if available, otherwise setIndicator
-    if (typeof action.setFeedback === 'function') {
-      await action.setFeedback({
+  private async updateButtonTitleForContext(contextId: string): Promise<void> {
+    const contextState = this.contextStates.get(contextId);
+    if (!contextState) return;
+
+    const channelState = this.getChannelState(contextState.host, contextState.channel);
+    const dBLevel = this.levelToDb(channelState.level);
+    const muteStatus = channelState.muted ? " (MUTED)" : "";
+    const title = `Ch${contextState.channel}\n${dBLevel}dB${muteStatus}`;
+
+    await contextState.action.setTitle(title);
+  }
+
+  private async updateDialFeedbackForContext(contextId: string): Promise<void> {
+    const contextState = this.contextStates.get(contextId);
+    if (!contextState) return;
+
+    const channelState = this.getChannelState(contextState.host, contextState.channel);
+    const percentage = Math.round(channelState.level * 100);
+
+    if (typeof contextState.action.setFeedback === 'function') {
+      await contextState.action.setFeedback({
         value: percentage,
         opacity: 100
       });
-    } else if (typeof action.setIndicator === 'function') {
-      await action.setIndicator(percentage);
-    }
-  }
-
-  private async updateAllButtonTitles(): Promise<void> {
-    // Note: This might need to be updated based on Stream Deck API
-    // For now, we'll handle individual instances through events
-    const instances = streamDeck.actions.getActionById("com.wheatland-community-church.behringer-x32.fader");
-    if (instances && Array.isArray(instances)) {
-      for (const instance of instances) {
-        await this.updateButtonTitle(instance);
-      }
-    } else if (instances) {
-      // Single instance
-      await this.updateButtonTitle(instances);
+    } else if (typeof contextState.action.setIndicator === 'function') {
+      await contextState.action.setIndicator(percentage);
     }
   }
 
