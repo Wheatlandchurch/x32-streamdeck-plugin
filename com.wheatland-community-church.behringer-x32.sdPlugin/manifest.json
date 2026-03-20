@@ -114,12 +114,12 @@
 		}
 	],
 	"Software": {
-		"MinimumVersion": "6.6"
+		"MinimumVersion": "6.9"
 	},
 	"Nodejs": {
 		"Version": "20"
 	},
 	"Category": "X32 Mixer Control",
 	"CategoryIcon": "imgs/category/icon",
-	"SDKVersion": 2
+	"SDKVersion": 3
 }
