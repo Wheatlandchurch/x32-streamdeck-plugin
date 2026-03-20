@@ -231,4 +231,17 @@ export class DCAControlAction extends SingletonAction<Settings> {
     await contextState.action.setTitle(`${dcaName}\n${status}`);
   }
 
+  private async subscribeToDCA(dca: number): Promise<void> {
+    if (!this.x32Client || !this.x32Client.isConnected()) return;
+    if (this.subscribedDCAs.has(dca)) return;
+
+    this.subscribedDCAs.add(dca);
+    this.x32Client.subscribeToDCA(dca);
+  }
+
+  private async requestDCAState(dca: number): Promise<void> {
+    if (!this.x32Client || !this.x32Client.isConnected()) return;
+    await this.x32Client.getDCAMuteStatus(dca);
+  }
+
 }

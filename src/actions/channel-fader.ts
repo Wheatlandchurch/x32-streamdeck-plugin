@@ -38,6 +38,7 @@ export class ChannelFaderAction extends SingletonAction<Settings> {
   > = new Map();
 
   private readonly FADER_UPDATE_DELAY = 50; // milliseconds - smooth but not overwhelming
+  private subscribedChannels: Set<number> = new Set();
 
   override async onWillAppear(ev: WillAppearEvent<Settings>): Promise<void> {
     const settings = ev.payload.settings;

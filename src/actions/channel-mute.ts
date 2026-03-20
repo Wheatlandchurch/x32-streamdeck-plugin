@@ -97,7 +97,7 @@ export class ChannelMuteAction extends SingletonAction<Settings> {
     try {
       await this.x32Client.muteChannel(channel, newMuted);
       this.channelMuteStates.set(channel, newMuted);
-      await this.updateButtonStateForContext(context);
+      await this.updateButtonStateForContext(contextId);
       await ev.action.showOk();
     } catch (error) {
       streamDeck.logger.error("Failed to toggle mute:", error);

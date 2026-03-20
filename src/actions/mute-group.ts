@@ -239,8 +239,17 @@ export class MuteGroupAction extends SingletonAction<Settings> {
     await action.setTitle(`${groupName}\\n${status}`);
   } */
 
-}
+  private async subscribeToMuteGroup(muteGroup: number): Promise<void> {
+    if (!this.x32Client || !this.x32Client.isConnected()) return;
+    if (this.subscribedGroups.has(muteGroup)) return;
 
-    }
+    this.subscribedGroups.add(muteGroup);
+    this.x32Client.subscribeToMuteGroup(muteGroup);
   }
+
+  private async requestMuteGroupState(muteGroup: number): Promise<void> {
+    if (!this.x32Client || !this.x32Client.isConnected()) return;
+    await this.x32Client.getMuteGroupState(muteGroup);
+  }
+
 }
