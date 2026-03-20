@@ -11,8 +11,9 @@ type Settings = {
 
 @action({ UUID: "com.wheatland-community-church.behringer-x32.fader" })
 export class ChannelFaderAction extends SingletonAction<Settings> {
-  private x32Client: X32Client | null = null;
-  private connectedHost: string | null = null;
+  // Support multiple X32 connections (one per host)
+  private x32Clients: Map<string, X32Client> = new Map();
+  private hostSubscriptions: Map<string, Set<number>> = new Map();
 
   // Track per-context state to support multiple keys using different channels
   private contextStates: Map<
@@ -26,16 +27,13 @@ export class ChannelFaderAction extends SingletonAction<Settings> {
   > = new Map();
 
   // Track per-channel X32 state so multiple contexts sharing the same channel stay in sync
-  private channelStates: Map<
-    number,
-    {
-      level: number;
-      muted: boolean;
-      initialized: boolean;
-      pendingFaderUpdate: number | null;
-      faderUpdateTimer: NodeJS.Timeout | null;
-    }
-  > = new Map();
+  private channelStates: Map<string, Map<number, {
+    level: number;
+    muted: boolean;
+    initialized: boolean;
+    pendingFaderUpdate: number | null;
+    faderUpdateTimer: NodeJS.Timeout | null;
+  }>> = new Map();
 
   private readonly FADER_UPDATE_DELAY = 50; // milliseconds - smooth but not overwhelming
   private subscribedChannels: Set<number> = new Set();
@@ -69,8 +67,8 @@ export class ChannelFaderAction extends SingletonAction<Settings> {
     });
 
     await this.ensureConnected(host);
-    await this.subscribeToChannel(channel);
-    await this.requestChannelState(channel);
+    await this.subscribeToChannel(host, channel);
+    await this.requestChannelState(host, channel);
 
     // Ensure UI reflects the latest known state (may be initialized via polling)
     await this.updateButtonTitleForContext(contextId);
@@ -89,8 +87,8 @@ export class ChannelFaderAction extends SingletonAction<Settings> {
 
     const { host, channel } = contextState;
 
-    await this.ensureConnected(host);
-    if (!this.x32Client || !this.x32Client.isConnected()) {
+    const client = await this.ensureConnected(host);
+    if (!client || !client.isConnected()) {
       streamDeck.logger.error("Failed to connect to X32");
       await ev.action.showAlert();
       return;
@@ -100,8 +98,8 @@ export class ChannelFaderAction extends SingletonAction<Settings> {
     const unityLevel = 0.75;
 
     try {
-      await this.x32Client.setChannelFader(channel, unityLevel);
-      const channelState = this.getChannelState(channel);
+      await client.setChannelFader(channel, unityLevel);
+      const channelState = this.getChannelState(host, channel);
       channelState.level = unityLevel;
       channelState.initialized = true;
 
@@ -125,12 +123,13 @@ export class ChannelFaderAction extends SingletonAction<Settings> {
 
     const { host, channel } = contextState;
 
-    if (!this.x32Client || !this.x32Client.isConnected()) {
+    const client = this.x32Clients.get(host);
+    if (!client || !client.isConnected()) {
       await ev.action.showAlert();
       return;
     }
 
-    const channelState = this.getChannelState(channel);
+    const channelState = this.getChannelState(host, channel);
     if (!channelState.initialized) {
       streamDeck.logger.warn("Waiting for initial fader level from X32...");
       return;
@@ -158,7 +157,7 @@ export class ChannelFaderAction extends SingletonAction<Settings> {
 
       channelState.faderUpdateTimer = setTimeout(async () => {
         if (channelState.pendingFaderUpdate !== null) {
-          await this.x32Client!.setChannelFader(channel, channelState.pendingFaderUpdate);
+          await client.setChannelFader(channel, channelState.pendingFaderUpdate);
           channelState.pendingFaderUpdate = null;
         }
       }, this.FADER_UPDATE_DELAY);
@@ -178,20 +177,21 @@ export class ChannelFaderAction extends SingletonAction<Settings> {
       return;
     }
 
-    const { channel } = contextState;
+    const { host, channel } = contextState;
 
-    if (!this.x32Client || !this.x32Client.isConnected()) {
+    const client = this.x32Clients.get(host);
+    if (!client || !client.isConnected()) {
       return;
     }
 
     try {
-      const channelState = this.getChannelState(channel);
+      const channelState = this.getChannelState(host, channel);
 
       // Toggle between current level and unity (0dB)
       const unityLevel = 0.75;
       const newLevel = Math.abs(channelState.level - unityLevel) < 0.01 ? 0 : unityLevel;
 
-      await this.x32Client.setChannelFader(channel, newLevel);
+      await client.setChannelFader(channel, newLevel);
       channelState.level = newLevel;
       channelState.initialized = true;
 
@@ -214,22 +214,22 @@ export class ChannelFaderAction extends SingletonAction<Settings> {
 
     contextState.isDialPressed = true;
 
-    if (!this.x32Client || !this.x32Client.isConnected()) {
+    const { host, channel } = contextState;
+    const client = this.x32Clients.get(host);
+    if (!client || !client.isConnected()) {
       await ev.action.showAlert();
       return;
     }
 
-    const { channel } = contextState;
-
     try {
       const dialAction = ev.payload.settings.dialPressAction || 'mute';
-      const channelState = this.getChannelState(channel);
+      const channelState = this.getChannelState(host, channel);
 
       switch (dialAction) {
         case 'mute':
           // Toggle mute/unmute
           channelState.muted = !channelState.muted;
-          await this.x32Client.muteChannel(channel, channelState.muted);
+          await client.muteChannel(channel, channelState.muted);
           await this.updateButtonTitleForContext(contextId);
           streamDeck.logger.info(`Channel ${channel} ${channelState.muted ? 'muted' : 'unmuted'}`);
           break;
@@ -239,7 +239,7 @@ export class ChannelFaderAction extends SingletonAction<Settings> {
           const unityLevel = 0.75;
           channelState.level = unityLevel;
           channelState.initialized = true;
-          await this.x32Client.setChannelFader(channel, unityLevel);
+          await client.setChannelFader(channel, unityLevel);
           await this.updateButtonTitleForContext(contextId);
           await this.updateDialFeedbackForContext(contextId);
           streamDeck.logger.info(`Channel ${channel} set to unity (0dB)`);
@@ -311,75 +311,82 @@ export class ChannelFaderAction extends SingletonAction<Settings> {
     }
   }
 
-  private async ensureConnected(host: string): Promise<void> {
-    if (this.x32Client && this.connectedHost === host && this.x32Client.isConnected()) {
-      return;
-    }
-
-    if (this.x32Client) {
-      this.x32Client.disconnect();
-      this.x32Client = null;
-      this.connectedHost = null;
+  private async ensureConnected(host: string): Promise<X32Client> {
+    if (this.x32Clients.has(host)) {
+      const client = this.x32Clients.get(host)!;
+      if (client.isConnected()) {
+        return client;
+      }
+      // Client exists but not connected, remove it
+      client.disconnect();
+      this.x32Clients.delete(host);
     }
 
     try {
-      this.x32Client = new X32Client({
+      const client = new X32Client({
         host,
         port: 10023
       });
 
-      this.connectedHost = host;
-
-      this.x32Client.on('error', (error) => {
-        streamDeck.logger.error("X32 Client error:", error);
+      client.on('error', (error) => {
+        streamDeck.logger.error(`X32 Client error for ${host}:`, error);
       });
 
-      this.x32Client.on('message', (msg) => {
-        this.handleX32Message(msg);
+      client.on('message', (msg) => {
+        this.handleX32Message(msg, host);
       });
 
-      await this.x32Client.connect();
-      streamDeck.logger.info(`Connected to X32 at ${host}:10023`);
-
-      // Re-subscribe to any channels we were previously tracking
-      for (const channel of this.subscribedChannels) {
-        await this.x32Client.subscribeToChannel(channel);
-        await this.requestChannelState(channel);
+      await client.connect();
+      this.x32Clients.set(host, client);
+      
+      // Re-subscribe to any channels we were previously tracking for this host
+      const hostChannels = this.hostSubscriptions.get(host) || new Set();
+      for (const channel of hostChannels) {
+        client.subscribeToChannel(channel);
+        client.getChannelMuteStatus(channel).catch(() => {});
+        client.getChannelFaderLevel(channel).catch(() => {});
       }
+
+      streamDeck.logger.info(`Connected to X32 at ${host}:10023`);
+      return client;
     } catch (error) {
-      streamDeck.logger.error("Failed to connect to X32:", error);
-      this.x32Client = null;
-      this.connectedHost = null;
+      streamDeck.logger.error(`Failed to connect to X32 at ${host}:`, error);
+      throw error;
     }
   }
 
-  private async subscribeToChannel(channel: number): Promise<void> {
-    if (!this.x32Client || !this.x32Client.isConnected()) return;
-    if (this.subscribedChannels.has(channel)) return;
+  private async subscribeToChannel(host: string, channel: number): Promise<void> {
+    const client = this.x32Clients.get(host);
+    if (!client || !client.isConnected()) return;
 
-    this.subscribedChannels.add(channel);
-    this.x32Client.subscribeToChannel(channel);
+    const hostChannels = this.hostSubscriptions.get(host) || new Set();
+    if (hostChannels.has(channel)) return;
+
+    hostChannels.add(channel);
+    this.hostSubscriptions.set(host, hostChannels);
+    client.subscribeToChannel(channel);
   }
 
-  private async requestChannelState(channel: number): Promise<void> {
-    if (!this.x32Client || !this.x32Client.isConnected()) return;
-    await this.x32Client.getChannelFaderLevel(channel);
-    await this.x32Client.getChannelMuteStatus(channel);
+  private async requestChannelState(host: string, channel: number): Promise<void> {
+    const client = this.x32Clients.get(host);
+    if (!client || !client.isConnected()) return;
+    await client.getChannelFaderLevel(channel);
+    await client.getChannelMuteStatus(channel);
   }
 
-  private handleX32Message(msg: { address: string; args: any[] }): void {
+  private handleX32Message(msg: { address: string; args: any[] }, host: string): void {
     // Handle fader level updates
     const faderMatch = msg.address.match(/^\/ch\/(\d{2})\/mix\/fader$/);
     if (faderMatch && msg.args.length > 0) {
       const channel = parseInt(faderMatch[1], 10);
       const level = parseFloat(msg.args[0]);
-      const state = this.getChannelState(channel);
+      const state = this.getChannelState(host, channel);
       state.level = level;
       state.initialized = true;
 
-      // Update any contexts that care about this channel
+      // Update any contexts that care about this channel on this host
       for (const [contextId, contextState] of this.contextStates.entries()) {
-        if (contextState.channel === channel) {
+        if (contextState.host === host && contextState.channel === channel) {
           this.updateButtonTitleForContext(contextId).catch((error) => {
             streamDeck.logger.error("Failed to update button title:", error);
           });
@@ -397,11 +404,11 @@ export class ChannelFaderAction extends SingletonAction<Settings> {
     if (muteMatch && msg.args.length > 0) {
       const channel = parseInt(muteMatch[1], 10);
       const isOn = msg.args[0] === 1;
-      const state = this.getChannelState(channel);
+      const state = this.getChannelState(host, channel);
       state.muted = !isOn;
 
       for (const [contextId, contextState] of this.contextStates.entries()) {
-        if (contextState.channel === channel) {
+        if (contextState.host === host && contextState.channel === channel) {
           this.updateButtonTitleForContext(contextId).catch((error) => {
             streamDeck.logger.error("Failed to update button title:", error);
           });
@@ -414,25 +421,27 @@ export class ChannelFaderAction extends SingletonAction<Settings> {
 
 
 
-  private getChannelState(channel: number) {
-    if (!this.channelStates.has(channel)) {
-      this.channelStates.set(channel, {
+  private getChannelState(host: string, channel: number) {
+    const hostStates = this.channelStates.get(host) || new Map();
+    if (!hostStates.has(channel)) {
+      hostStates.set(channel, {
         level: 0,
         muted: false,
         initialized: false,
         pendingFaderUpdate: null,
         faderUpdateTimer: null
       });
+      this.channelStates.set(host, hostStates);
     }
 
-    return this.channelStates.get(channel)!;
+    return hostStates.get(channel)!;
   }
 
   private async updateButtonTitleForContext(contextId: string): Promise<void> {
     const contextState = this.contextStates.get(contextId);
     if (!contextState) return;
 
-    const channelState = this.getChannelState(contextState.channel);
+    const channelState = this.getChannelState(contextState.host, contextState.channel);
     const dBLevel = this.levelToDb(channelState.level);
     const muteStatus = channelState.muted ? " (MUTED)" : "";
     const title = `Ch${contextState.channel}\n${dBLevel}dB${muteStatus}`;
@@ -444,7 +453,7 @@ export class ChannelFaderAction extends SingletonAction<Settings> {
     const contextState = this.contextStates.get(contextId);
     if (!contextState) return;
 
-    const channelState = this.getChannelState(contextState.channel);
+    const channelState = this.getChannelState(contextState.host, contextState.channel);
     const percentage = Math.round(channelState.level * 100);
 
     if (typeof contextState.action.setFeedback === 'function') {

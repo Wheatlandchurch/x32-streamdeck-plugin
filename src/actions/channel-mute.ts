@@ -8,8 +8,9 @@ type Settings = {
 
 @action({ UUID: "com.wheatland-community-church.behringer-x32.mute" })
 export class ChannelMuteAction extends SingletonAction<Settings> {
-  private x32Client: X32Client | null = null;
-  private connectedHost: string | null = null;
+  // Support multiple X32 connections (one per host)
+  private x32Clients: Map<string, X32Client> = new Map();
+  private hostSubscriptions: Map<string, Set<number>> = new Map();
 
   // Keep per-context state (since this is a SingletonAction, multiple keys can exist simultaneously)
   private contextStates: Map<
@@ -21,8 +22,8 @@ export class ChannelMuteAction extends SingletonAction<Settings> {
     }
   > = new Map();
 
-  // Track the latest mute state per channel so we don't mix state between contexts
-  private channelMuteStates: Map<number, boolean> = new Map();
+  // Track the latest mute state per channel per host
+  private channelMuteStates: Map<string, Map<number, boolean>> = new Map();
   private subscribedChannels: Set<number> = new Set();
 
   override async onWillAppear(ev: WillAppearEvent<Settings>): Promise<void> {
@@ -50,8 +51,8 @@ export class ChannelMuteAction extends SingletonAction<Settings> {
     });
 
     await this.ensureConnected(host);
-    await this.subscribeToChannel(channel);
-    await this.requestChannelState(channel);
+    await this.subscribeToChannel(host, channel);
+    await this.requestChannelState(host, channel);
     await this.updateButtonStateForContext(contextId);
   }
 
@@ -59,16 +60,26 @@ export class ChannelMuteAction extends SingletonAction<Settings> {
     const contextId = ev.action.id;
     const state = this.contextStates.get(contextId);
 
+    const channel = state?.channel;
+    const host = state?.host;
+
     // Remove this action instance
     this.contextStates.delete(contextId);
 
-    const channel = state?.channel;
-
-    // If no remaining context is using this channel, unsubscribe
-    if (channel && !this.isChannelUsed(channel)) {
-      this.subscribedChannels.delete(channel);
-      this.x32Client?.unsubscribeFromChannel(channel);
-      this.channelMuteStates.delete(channel);
+    // If no remaining context is using this channel on this host, unsubscribe
+    if (channel && host && !this.isChannelUsedOnHost(host, channel)) {
+      const hostChannels = this.hostSubscriptions.get(host);
+      if (hostChannels) {
+        hostChannels.delete(channel);
+        const client = this.x32Clients.get(host);
+        if (client) {
+          client.unsubscribeFromChannel(channel);
+        }
+      }
+      const hostStates = this.channelMuteStates.get(host);
+      if (hostStates) {
+        hostStates.delete(channel);
+      }
     }
   }
 
@@ -84,19 +95,21 @@ export class ChannelMuteAction extends SingletonAction<Settings> {
 
     const { host, channel } = contextState;
 
-    await this.ensureConnected(host);
-    if (!this.x32Client || !this.x32Client.isConnected()) {
+    const client = await this.ensureConnected(host);
+    if (!client || !client.isConnected()) {
       streamDeck.logger.error("Failed to connect to X32");
       await ev.action.showAlert();
       return;
     }
 
-    const currentMuted = this.channelMuteStates.get(channel) ?? false;
+    const hostStates = this.channelMuteStates.get(host) || new Map();
+    const currentMuted = hostStates.get(channel) ?? false;
     const newMuted = !currentMuted;
 
     try {
-      await this.x32Client.muteChannel(channel, newMuted);
-      this.channelMuteStates.set(channel, newMuted);
+      await client.muteChannel(channel, newMuted);
+      hostStates.set(channel, newMuted);
+      this.channelMuteStates.set(host, hostStates);
       await this.updateButtonStateForContext(contextId);
       await ev.action.showOk();
     } catch (error) {
@@ -144,62 +157,68 @@ export class ChannelMuteAction extends SingletonAction<Settings> {
     }
   }
 
-  private async ensureConnected(host: string): Promise<void> {
-    if (this.x32Client && this.connectedHost === host && this.x32Client.isConnected()) {
-      return;
-    }
-
-    if (this.x32Client) {
-      this.x32Client.disconnect();
-      this.x32Client = null;
-      this.connectedHost = null;
+  private async ensureConnected(host: string): Promise<X32Client> {
+    if (this.x32Clients.has(host)) {
+      const client = this.x32Clients.get(host)!;
+      if (client.isConnected()) {
+        return client;
+      }
+      // Client exists but not connected, remove it
+      client.disconnect();
+      this.x32Clients.delete(host);
     }
 
     try {
-      this.x32Client = new X32Client({
+      const client = new X32Client({
         host,
         port: 10023
       });
 
-      this.connectedHost = host;
-
-      this.x32Client.on('error', (error) => {
-        streamDeck.logger.error("X32 Client error:", error);
+      client.on('error', (error) => {
+        streamDeck.logger.error(`X32 Client error for ${host}:`, error);
       });
 
-      this.x32Client.on('message', (msg) => {
-        this.handleX32Message(msg);
+      client.on('message', (msg) => {
+        this.handleX32Message(msg, host);
       });
 
-      await this.x32Client.connect();
-      streamDeck.logger.info(`Connected to X32 at ${host}:10023`);
-
-      // Re-subscribe to any channels we were previously tracking
-      for (const channel of this.subscribedChannels) {
-        await this.x32Client.subscribeToChannel(channel);
-        await this.x32Client.getChannelMuteStatus(channel);
+      await client.connect();
+      this.x32Clients.set(host, client);
+      
+      // Re-subscribe to any channels we were previously tracking for this host
+      const hostChannels = this.hostSubscriptions.get(host) || new Set();
+      for (const channel of hostChannels) {
+        client.subscribeToChannel(channel);
+        client.getChannelMuteStatus(channel).catch(() => {});
       }
+
+      streamDeck.logger.info(`Connected to X32 at ${host}:10023`);
+      return client;
     } catch (error) {
-      streamDeck.logger.error("Failed to connect to X32:", error);
-      this.x32Client = null;
-      this.connectedHost = null;
+      streamDeck.logger.error(`Failed to connect to X32 at ${host}:`, error);
+      throw error;
     }
   }
 
-  private async subscribeToChannel(channel: number): Promise<void> {
-    if (!this.x32Client || !this.x32Client.isConnected()) return;
-    if (this.subscribedChannels.has(channel)) return;
+  private async subscribeToChannel(host: string, channel: number): Promise<void> {
+    const client = this.x32Clients.get(host);
+    if (!client || !client.isConnected()) return;
 
-    this.subscribedChannels.add(channel);
-    this.x32Client.subscribeToChannel(channel);
+    const hostChannels = this.hostSubscriptions.get(host) || new Set();
+    if (hostChannels.has(channel)) return;
+
+    hostChannels.add(channel);
+    this.hostSubscriptions.set(host, hostChannels);
+    client.subscribeToChannel(channel);
   }
 
-  private async requestChannelState(channel: number): Promise<void> {
-    if (!this.x32Client || !this.x32Client.isConnected()) return;
-    await this.x32Client.getChannelMuteStatus(channel);
+  private async requestChannelState(host: string, channel: number): Promise<void> {
+    const client = this.x32Clients.get(host);
+    if (!client || !client.isConnected()) return;
+    await client.getChannelMuteStatus(channel);
   }
 
-  private handleX32Message(msg: { address: string; args: any[] }): void {
+  private handleX32Message(msg: { address: string; args: any[] }, host: string): void {
     // Handle only mute state messages for channels (e.g. /ch/01/mix/on)
     const match = msg.address.match(/^\/ch\/(\d{2})\/mix\/on$/);
     if (!match || msg.args.length === 0) {
@@ -210,11 +229,13 @@ export class ChannelMuteAction extends SingletonAction<Settings> {
     const isOn = msg.args[0] === 1;
     const muted = !isOn;
 
-    this.channelMuteStates.set(channel, muted);
+    const hostStates = this.channelMuteStates.get(host) || new Map();
+    hostStates.set(channel, muted);
+    this.channelMuteStates.set(host, hostStates);
 
-    // Update any contexts that care about this channel
+    // Update any contexts that care about this channel on this host
     for (const [context, state] of this.contextStates.entries()) {
-      if (state.channel === channel) {
+      if (state.host === host && state.channel === channel) {
         this.updateButtonStateForContext(context).catch((error) => {
           streamDeck.logger.error("Failed to update button state:", error);
         });
@@ -226,13 +247,14 @@ export class ChannelMuteAction extends SingletonAction<Settings> {
     const state = this.contextStates.get(context);
     if (!state) return;
 
-    const muted = this.channelMuteStates.get(state.channel) ?? false;
+    const hostStates = this.channelMuteStates.get(state.host) || new Map();
+    const muted = hostStates.get(state.channel) ?? false;
     await state.action.setState(muted ? 1 : 0);
   }
 
-  private isChannelUsed(channel: number): boolean {
+  private isChannelUsedOnHost(host: string, channel: number): boolean {
     for (const state of this.contextStates.values()) {
-      if (state.channel === channel) {
+      if (state.host === host && state.channel === channel) {
         return true;
       }
     }

@@ -9,8 +9,9 @@ type Settings = {
 
 @action({ UUID: "com.wheatland-community-church.behringer-x32.dca" })
 export class DCAControlAction extends SingletonAction<Settings> {
-  private x32Client: X32Client | null = null;
-  private connectedHost: string | null = null;
+  // Support multiple X32 connections (one per host)
+  private x32Clients: Map<string, X32Client> = new Map();
+  private hostSubscriptions: Map<string, Set<number>> = new Map();
 
   // Keep per-context state (since this is a SingletonAction, multiple keys can exist simultaneously)
   private contextStates: Map<
@@ -22,8 +23,8 @@ export class DCAControlAction extends SingletonAction<Settings> {
     }
   > = new Map();
 
-  // Track the current mute state per DCA so we don't mix state between buttons
-  private dcaStates: Map<number, { muted: boolean }> = new Map();
+  // Track per-DCA state per host
+  private dcaStates: Map<string, Map<number, { muted: boolean }>> = new Map();
   private subscribedDCAs: Set<number> = new Set();
 
   override async onWillAppear(ev: WillAppearEvent<Settings>): Promise<void> {
@@ -52,8 +53,8 @@ export class DCAControlAction extends SingletonAction<Settings> {
     });
 
     await this.ensureConnected(host);
-    await this.subscribeToDCA(dca);
-    await this.requestDCAState(dca);
+    await this.subscribeToDCA(host, dca);
+    await this.requestDCAState(host, dca);
     await this.updateButtonForContext(contextId);
   }
 
@@ -66,13 +67,22 @@ export class DCAControlAction extends SingletonAction<Settings> {
       return;
     }
 
-    const { dca } = contextState;
+    const { host, dca } = contextState;
 
-    // If no remaining context uses this DCA, unsubscribe and clear cached state
-    if (![...this.contextStates.values()].some(cs => cs.dca === dca)) {
-      this.subscribedDCAs.delete(dca);
-      this.x32Client?.unsubscribeFromDCA(dca);
-      this.dcaStates.delete(dca);
+    // If no remaining context uses this DCA on this host, unsubscribe and clear cached state
+    if (![...this.contextStates.values()].some(cs => cs.host === host && cs.dca === dca)) {
+      const hostDCAs = this.hostSubscriptions.get(host);
+      if (hostDCAs) {
+        hostDCAs.delete(dca);
+        const client = this.x32Clients.get(host);
+        if (client) {
+          client.unsubscribeFromDCA(dca);
+        }
+      }
+      const hostStates = this.dcaStates.get(host);
+      if (hostStates) {
+        hostStates.delete(dca);
+      }
     }
   }
 
@@ -88,18 +98,21 @@ export class DCAControlAction extends SingletonAction<Settings> {
 
     const { host, dca } = contextState;
 
-    await this.ensureConnected(host);
-    if (!this.x32Client || !this.x32Client.isConnected()) {
+    const client = await this.ensureConnected(host);
+    if (!client || !client.isConnected()) {
       streamDeck.logger.error("Failed to connect to X32");
       await ev.action.showAlert();
       return;
     }
 
-    const state = this.getDCAState(dca);
+    const hostStates = this.dcaStates.get(host) || new Map();
+    const state = hostStates.get(dca) || { muted: false };
     state.muted = !state.muted;
+    hostStates.set(dca, state);
+    this.dcaStates.set(host, hostStates);
 
     try {
-      await this.x32Client.muteDCA(dca, state.muted);
+      await client.muteDCA(dca, state.muted);
       await this.updateButtonForContext(contextId);
       await ev.action.showOk();
 
@@ -149,49 +162,50 @@ export class DCAControlAction extends SingletonAction<Settings> {
     }
   }
 
-  private async ensureConnected(host: string): Promise<void> {
-    if (this.x32Client && this.connectedHost === host && this.x32Client.isConnected()) {
-      return;
-    }
-
-    if (this.x32Client) {
-      this.x32Client.disconnect();
-      this.x32Client = null;
-      this.connectedHost = null;
+  private async ensureConnected(host: string): Promise<X32Client> {
+    if (this.x32Clients.has(host)) {
+      const client = this.x32Clients.get(host)!;
+      if (client.isConnected()) {
+        return client;
+      }
+      // Client exists but not connected, remove it
+      client.disconnect();
+      this.x32Clients.delete(host);
     }
 
     try {
-      this.x32Client = new X32Client({
+      const client = new X32Client({
         host,
         port: 10023
       });
 
-      this.connectedHost = host;
-
-      this.x32Client.on('error', (error) => {
-        streamDeck.logger.error("X32 Client error:", error);
+      client.on('error', (error) => {
+        streamDeck.logger.error(`X32 Client error for ${host}:`, error);
       });
 
-      this.x32Client.on('message', (msg) => {
-        this.handleX32Message(msg);
+      client.on('message', (msg) => {
+        this.handleX32Message(msg, host);
       });
 
-      await this.x32Client.connect();
-      streamDeck.logger.info(`Connected to X32 at ${host}:10023`);
-
-      // Re-subscribe to any DCAs we were previously tracking
-      for (const dca of this.subscribedDCAs) {
-        await this.x32Client.subscribeToDCA(dca);
-        await this.requestDCAState(dca);
+      await client.connect();
+      this.x32Clients.set(host, client);
+      
+      // Re-subscribe to any DCAs we were previously tracking for this host
+      const hostDCAs = this.hostSubscriptions.get(host) || new Set();
+      for (const dca of hostDCAs) {
+        client.subscribeToDCA(dca);
+        client.getDCAMuteStatus(dca).catch(() => {});
       }
+
+      streamDeck.logger.info(`Connected to X32 at ${host}:10023`);
+      return client;
     } catch (error) {
-      streamDeck.logger.error("Failed to connect to X32:", error);
-      this.x32Client = null;
-      this.connectedHost = null;
+      streamDeck.logger.error(`Failed to connect to X32 at ${host}:`, error);
+      throw error;
     }
   }
 
-  private handleX32Message(msg: { address: string; args: any[] }): void {
+  private handleX32Message(msg: { address: string; args: any[] }, host: string): void {
     const match = msg.address.match(/^\/dca\/(\d+)\/on$/);
     if (!match || msg.args.length === 0) {
       return;
@@ -199,11 +213,15 @@ export class DCAControlAction extends SingletonAction<Settings> {
 
     const dca = parseInt(match[1], 10);
     const isOn = msg.args[0] === 1;
-    const state = this.getDCAState(dca);
+    
+    const hostStates = this.dcaStates.get(host) || new Map();
+    const state = hostStates.get(dca) || { muted: false };
     state.muted = !isOn;
+    hostStates.set(dca, state);
+    this.dcaStates.set(host, hostStates);
 
     for (const [contextId, contextState] of this.contextStates.entries()) {
-      if (contextState.dca === dca) {
+      if (contextState.host === host && contextState.dca === dca) {
         this.updateButtonForContext(contextId).catch((error) => {
           streamDeck.logger.error("Failed to update DCA button state:", error);
         });
@@ -211,18 +229,20 @@ export class DCAControlAction extends SingletonAction<Settings> {
     }
   }
 
-  private getDCAState(dca: number) {
-    if (!this.dcaStates.has(dca)) {
-      this.dcaStates.set(dca, { muted: false });
+  private getDCAState(host: string, dca: number) {
+    const hostStates = this.dcaStates.get(host) || new Map();
+    if (!hostStates.has(dca)) {
+      hostStates.set(dca, { muted: false });
+      this.dcaStates.set(host, hostStates);
     }
-    return this.dcaStates.get(dca)!;
+    return hostStates.get(dca)!;
   }
 
   private async updateButtonForContext(contextId: string): Promise<void> {
     const contextState = this.contextStates.get(contextId);
     if (!contextState) return;
 
-    const dcaState = this.getDCAState(contextState.dca);
+    const dcaState = this.getDCAState(contextState.host, contextState.dca);
     const settings = await contextState.action.getSettings();
     const dcaName = settings.dcaName || `DCA ${contextState.dca}`;
     const status = dcaState.muted ? "MUTED" : "ACTIVE";
@@ -231,17 +251,22 @@ export class DCAControlAction extends SingletonAction<Settings> {
     await contextState.action.setTitle(`${dcaName}\n${status}`);
   }
 
-  private async subscribeToDCA(dca: number): Promise<void> {
-    if (!this.x32Client || !this.x32Client.isConnected()) return;
-    if (this.subscribedDCAs.has(dca)) return;
+  private async subscribeToDCA(host: string, dca: number): Promise<void> {
+    const client = this.x32Clients.get(host);
+    if (!client || !client.isConnected()) return;
 
-    this.subscribedDCAs.add(dca);
-    this.x32Client.subscribeToDCA(dca);
+    const hostDCAs = this.hostSubscriptions.get(host) || new Set();
+    if (hostDCAs.has(dca)) return;
+
+    hostDCAs.add(dca);
+    this.hostSubscriptions.set(host, hostDCAs);
+    client.subscribeToDCA(dca);
   }
 
-  private async requestDCAState(dca: number): Promise<void> {
-    if (!this.x32Client || !this.x32Client.isConnected()) return;
-    await this.x32Client.getDCAMuteStatus(dca);
+  private async requestDCAState(host: string, dca: number): Promise<void> {
+    const client = this.x32Clients.get(host);
+    if (!client || !client.isConnected()) return;
+    await client.getDCAMuteStatus(dca);
   }
 
 }
