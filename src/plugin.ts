@@ -1,4 +1,4 @@
-import streamDeck, { LogLevel } from "@elgato/streamdeck";
+import streamDeck from "@elgato/streamdeck";
 
 import { ChannelMuteAction } from "./actions/channel-mute";
 import { ChannelFaderAction } from "./actions/channel-fader";
@@ -8,7 +8,7 @@ import { MuteGroupAction } from "./actions/mute-group";
 import { ConnectionManager, ErrorHandler } from "./utils";
 
 // We can enable "trace" logging so that all messages between the Stream Deck, and the plugin are recorded. When storing sensitive information
-streamDeck.logger.setLevel(LogLevel.TRACE);
+streamDeck.logger.setLevel("trace");
 
 // Register actions
 streamDeck.actions.registerAction(new ChannelMuteAction());

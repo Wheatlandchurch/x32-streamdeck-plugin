@@ -288,7 +288,7 @@ export class ChannelFaderAction extends SingletonAction<Settings> {
         await testClient.connect();
         
         // Send success message back to property inspector
-        streamDeck.ui.current?.sendToPropertyInspector({
+        streamDeck.ui.sendToPropertyInspector({
           event: 'connectionTestResult',
           success: true,
           message: `Successfully connected to X32 at ${payload.host}:10023`
@@ -300,7 +300,7 @@ export class ChannelFaderAction extends SingletonAction<Settings> {
         testClient.disconnect();
       } catch (error) {
         // Send error message back to property inspector
-        streamDeck.ui.current?.sendToPropertyInspector({
+        streamDeck.ui.sendToPropertyInspector({
           event: 'connectionTestResult',
           success: false,
           message: `Failed to connect: ${error instanceof Error ? error.message : 'Unknown error'}`
