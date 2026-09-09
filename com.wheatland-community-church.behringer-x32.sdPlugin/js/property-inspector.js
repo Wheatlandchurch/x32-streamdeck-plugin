@@ -258,19 +258,24 @@ async function testConnection() {
 
 // Show connection status
 function showStatus(type, message) {
-    const statusDiv = document.getElementById('connectionStatus');
-    const statusText = document.getElementById('statusText');
-    
-    if (!statusDiv || !statusText) return;
-    
-    statusDiv.style.display = 'flex';
-    statusText.textContent = message;
-    statusText.className = `status-${type}`;
+    const statusDivs = document.querySelectorAll('#connectionStatus');
+    if (!statusDivs || statusDivs.length === 0) return;
+
+    statusDivs.forEach((statusDiv) => {
+        const statusText = statusDiv.querySelector('#statusText');
+        if (!statusText) return;
+
+        statusDiv.style.display = 'flex';
+        statusText.textContent = message;
+        statusText.className = `status-${type}`;
+    });
     
     // Hide status after 5 seconds for success/error messages
     if (type !== 'warning') {
         setTimeout(() => {
-            statusDiv.style.display = 'none';
+            statusDivs.forEach((statusDiv) => {
+                statusDiv.style.display = 'none';
+            });
         }, 5000);
     }
 }
@@ -285,10 +290,13 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Add test connection button listener
-    const testButton = document.getElementById('testConnection');
-    if (testButton) {
-        testButton.addEventListener('click', testConnection);
-    }
+    const testButtons = document.querySelectorAll('#testConnection');
+    testButtons.forEach((testButton) => {
+        if (!testButton.dataset.boundConnectionTest) {
+            testButton.addEventListener('click', testConnection);
+            testButton.dataset.boundConnectionTest = 'true';
+        }
+    });
     
     // Auto-fill scene name when scene number changes
     const sceneSelect = document.getElementById('scene');

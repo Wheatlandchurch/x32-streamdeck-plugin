@@ -118,8 +118,8 @@ export class X32Client extends EventEmitter {
       }
 
       console.log('[X32MCU] Sending MIDI:', data.toString('hex'));
-      
-      this.socket.write(data as any, (error?: Error) => {
+
+      this.socket.write(data, (error?: Error | null) => {
         if (error) {
           console.error('[X32MCU] Error sending MIDI:', error);
           reject(error);

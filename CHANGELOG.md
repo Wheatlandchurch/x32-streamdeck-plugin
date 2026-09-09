@@ -5,6 +5,22 @@ All notable changes to the X32 Stream Deck Plugin will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.8] - 2026-09-09
+
+### Updated
+- Refreshed the plugin to the current Elgato Stream Deck SDK and CLI toolchain (`@elgato/streamdeck` v2.1.2, `@elgato/cli` v1.9.0)
+- Updated the TypeScript and build setup for current tooling compatibility, including modern Rollup and Node v20 support
+- Rebuilt and repackaged the plugin bundle to ensure the generated `.streamDeckPlugin` archive matches the current source and manifest version
+
+### Fixed
+- Corrected the property inspector status flow for the "Test Connection" button so it reports success/failure in the proper status element
+- Removed duplicate status markup and hardened the DOM targeting used by the inspector to avoid stale or ambiguous status updates
+- Resolved the stale package artifact issue where the bundle still showed older manifest metadata after a rebuild
+
+### Changed
+- Bumped the plugin version to `2.0.8.0` and aligned the manifest metadata with the current build output
+- Verified the packaged plugin is built for current Stream Deck software compatibility, including SDK v3 and software v7.5+
+
 ## [2.0.5] - 2026-03-20
 
 ### Fixed ⭐ Critical Architecture Fix

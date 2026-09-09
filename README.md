@@ -2,6 +2,18 @@
 
 A comprehensive Stream Deck plugin for controlling Behringer X32 digital mixers through OSC (Open Sound Control) protocol. This plugin provides extensive control over channel muting, fader levels, DCA groups, mute groups, and scene recall directly from your Stream Deck, with enhanced support for Stream Deck+ dials.
 
+Current release: v2.0.8.0
+
+This build is refreshed for current Elgato tooling and Stream Deck software v7.5+, using the modern Stream Deck SDK v3 runtime. It includes a clean rebuild, version-aligned packaging, and a fix for the property inspector connection test status flow.
+
+## Recent Updates
+
+- Refreshed the plugin to the current Elgato SDK/CLI toolchain (`@elgato/streamdeck` v2.1.2, `@elgato/cli` v1.9.0)
+- Updated the TypeScript and build configuration for current tooling compatibility
+- Rebuilt and re-packaged the plugin bundle to ensure the generated `.streamDeckPlugin` archive reflects the current source and manifest version
+- Fixed the property inspector "Test Connection" flow so status messages appear in the correct UI element and reflect real backend results
+- Verified the built bundle metadata and plugin manifest are aligned with the latest release version
+
 ## 🎛️ Features
 
 - **Channel Mute/Unmute**: Toggle mute status for any of the 32 input channels
@@ -24,7 +36,7 @@ A comprehensive Stream Deck plugin for controlling Behringer X32 digital mixers 
   - Stream Deck device (any model)
   - Stream Deck+ recommended for enhanced dial functionality
 - **Software**: 
-  - Stream Deck software v6.6 or higher (v6.6+ required for dial support)
+  - Stream Deck software v7.5 or higher (current SDK v3 support)
   - Node.js v20 or higher (for development)
 - **Mixer**: Behringer X32 digital mixer with network connectivity
 - **Network**: Both Stream Deck computer and X32 mixer on the same network
