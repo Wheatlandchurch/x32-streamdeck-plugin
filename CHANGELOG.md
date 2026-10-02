@@ -5,6 +5,17 @@ All notable changes to the X32 Stream Deck Plugin will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- Shared one UDP connection per mixer across action types and connection tests, preventing the plugin from exhausting the X32's four remote-update slots and interrupting X32 Edit synchronization.
+- Preserved shared subscriptions and connections when individual actions disconnect; coalesced concurrent connection attempts and cleaned up failed attempts and polling timers.
+- Encoded channel and DCA fader endpoints as OSC floats instead of integers.
+- Reused scene connections per mixer to avoid accumulating clients on page changes.
+
+### Testing
+- Added a UDP simulator regression test covering editor broadcasts alongside five plugin clients, subscription ownership, connection lifetime and fader encoding. See `SYNC_FIX.md` for hardware acceptance steps.
+
 ## [2.0.8] - 2026-09-09
 
 ### Updated

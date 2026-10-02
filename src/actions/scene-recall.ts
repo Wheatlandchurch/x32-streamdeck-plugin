@@ -11,6 +11,7 @@ type Settings = {
 @action({ UUID: "com.wheatland-community-church.behringer-x32.scene" })
 export class SceneRecallAction extends SingletonAction<Settings> {
   private x32Client: X32Client | null = null;
+  private x32Clients = new Map<string, X32Client>();
   private lastKeyPressTime: number = 0;
   private readonly DOUBLE_TAP_THRESHOLD = 500; // milliseconds
 
@@ -36,8 +37,8 @@ export class SceneRecallAction extends SingletonAction<Settings> {
   override async onKeyDown(ev: KeyDownEvent<Settings>): Promise<void> {
     const settings = ev.payload.settings;
     
+    await this.connectToX32(settings);
     if (!this.x32Client || !this.x32Client.isConnected()) {
-      await this.connectToX32(settings);
       if (!this.x32Client || !this.x32Client.isConnected()) {
         streamDeck.logger.error("Failed to connect to X32");
         await ev.action.showAlert();
@@ -130,6 +131,12 @@ export class SceneRecallAction extends SingletonAction<Settings> {
     }
 
     try {
+      const existing = this.x32Clients.get(settings.x32Host);
+      if (existing?.isConnected()) {
+        this.x32Client = existing;
+        return;
+      }
+      existing?.disconnect();
       this.x32Client = new X32Client({
         host: settings.x32Host,
         port: 10023
@@ -140,6 +147,7 @@ export class SceneRecallAction extends SingletonAction<Settings> {
       });
 
       await this.x32Client.connect();
+      this.x32Clients.set(settings.x32Host, this.x32Client);
       
       streamDeck.logger.info(`Connected to X32 at ${settings.x32Host}:10023`);
     } catch (error) {
