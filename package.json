@@ -4,6 +4,7 @@
   "description": "Stream Deck plugin for controlling Behringer X32 digital mixer",
   "main": "bin/plugin.js",
   "scripts": {
+    "test": "node --test tests/*.cjs",
     "build": "rollup -c",
     "watch": "rollup -c -w --watch.onEnd=\"streamdeck restart com.wheatland-community-church.behringer-x32\"",
     "dev": "npm run watch"
