@@ -6,11 +6,36 @@ export interface X32Config {
   port: number;
 }
 
+export type MixerFaderTarget = {
+  type: "channel" | "main" | "bus" | "matrix" | "dca";
+  index?: number;
+};
+
+export function getMixerFaderAddress(target: MixerFaderTarget): string {
+  switch (target.type) {
+    case "channel":
+      return `/ch/${target.index!.toString().padStart(2, "0")}/mix/fader`;
+    case "main":
+      return "/main/st/mix/fader";
+    case "bus":
+      return `/bus/${target.index!.toString().padStart(2, "0")}/mix/fader`;
+    case "matrix":
+      return `/mtx/${target.index!.toString().padStart(2, "0")}/mix/fader`;
+    case "dca":
+      return `/dca/${target.index}/fader`;
+  }
+}
+
+function getMixerMuteAddress(target: MixerFaderTarget): string {
+  return getMixerFaderAddress(target).replace(/fader$/, "on");
+}
+
 export class X32Client extends EventEmitter {
   private socket: dgram.Socket;
   private config: X32Config;
   private connected: boolean = false;
   private subscriptions: Set<string> = new Set();
+  private faderSubscriptions: Map<string, MixerFaderTarget> = new Map();
   private connectionPromise: {resolve: () => void, reject: (error: Error) => void, timeout: NodeJS.Timeout} | null = null;
 
   constructor(config: X32Config) {
@@ -269,6 +294,27 @@ export class X32Client extends EventEmitter {
     await this.send(address);
   }
 
+  async setMixerFader(target: MixerFaderTarget, level: number): Promise<void> {
+    const clampedLevel = Math.max(0, Math.min(1, level));
+    await this.send(getMixerFaderAddress(target), clampedLevel);
+  }
+
+  async getMixerFaderLevel(target: MixerFaderTarget): Promise<void> {
+    await this.send(getMixerFaderAddress(target));
+  }
+
+  async setMixerMute(target: MixerFaderTarget, muted: boolean): Promise<void> {
+    await this.send(getMixerMuteAddress(target), muted ? 0 : 1);
+  }
+
+  async getMixerMuteStatus(target: MixerFaderTarget): Promise<void> {
+    await this.send(getMixerMuteAddress(target));
+  }
+
+  subscribeToFaderTarget(target: MixerFaderTarget): void {
+    this.faderSubscriptions.set(getMixerFaderAddress(target), target);
+  }
+
   // DCA control methods
   async muteDCA(dca: number, muted: boolean): Promise<void> {
     const address = `/dca/${dca}/on`;
@@ -366,6 +412,11 @@ export class X32Client extends EventEmitter {
           const muteGroup = parseInt(subscription.split('_')[1]);
           this.getMuteGroupState(muteGroup).catch(() => {});
         }
+      });
+
+      this.faderSubscriptions.forEach(target => {
+        this.getMixerFaderLevel(target).catch(() => {});
+        this.getMixerMuteStatus(target).catch(() => {});
       });
     }, 500);
 

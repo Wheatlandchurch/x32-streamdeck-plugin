@@ -5,6 +5,13 @@ All notable changes to the X32 Stream Deck Plugin will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.9] - 2026-10-17
+
+### Added
+- Added Stream Deck+ dial fader control for Main L/R, bus masters (1-16), matrices (1-6), and DCA groups (1-8)
+- Added live fader and mute feedback for all supported mixer targets
+- Added target selection in the Mixer Fader property inspector, including immediate application of setting changes
+
 ## [2.0.8] - 2026-09-09
 
 ### Updated

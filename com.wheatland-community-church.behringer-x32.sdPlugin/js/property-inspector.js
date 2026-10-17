@@ -71,7 +71,7 @@ function updateUsageInstructions() {
         
         usageInfo.innerHTML = `
             <strong>Stream Deck+ Dial Controls:</strong><br>
-            • Rotate: Adjust fader level with visual feedback<br>
+            • Rotate: Adjust selected mixer fader with visual feedback<br>
             • Press: Configurable action (see setting above)<br>
             • Touch: Toggle between current level and unity (0dB)
         `;
@@ -96,10 +96,15 @@ function loadSettingsFromPayload(settings) {
         if (hostInput) hostInput.value = settings.x32Host;
     }
     
-    // Load channel-specific settings
-    if (settings.channel) {
-        const channelSelect = document.getElementById('channel');
-        if (channelSelect) channelSelect.value = settings.channel;
+    // Load mixer fader target, retaining settings saved by earlier versions.
+    const targetType = settings.targetType || 'channel';
+    const targetTypeSelect = document.getElementById('targetType');
+    if (targetTypeSelect) targetTypeSelect.value = targetType;
+    const targetNumber = settings.targetNumber || settings.channel || 1;
+    updateFaderTargetOptions(targetType, targetNumber);
+    if (targetType === 'channel') {
+        const channelSelect = document.getElementById('targetNumber');
+        if (channelSelect) channelSelect.value = targetNumber;
     }
     
     // Load scene-specific settings
@@ -147,6 +152,37 @@ function loadSettingsFromPayload(settings) {
     }
 }
 
+function updateFaderTargetOptions(targetType, selectedValue = 1) {
+    const targetSelect = document.getElementById('targetNumber');
+    const targetLabel = document.getElementById('targetNumberLabel');
+    const targetSetting = document.getElementById('targetNumberSetting');
+    if (!targetSelect || !targetLabel || !targetSetting) return;
+
+    const targetConfig = {
+        channel: { label: 'Input Channel', count: 32, prefix: 'Input' },
+        bus: { label: 'Bus Master', count: 16, prefix: 'Bus' },
+        matrix: { label: 'Matrix', count: 6, prefix: 'Matrix' },
+        dca: { label: 'DCA', count: 8, prefix: 'DCA' }
+    }[targetType];
+
+    if (!targetConfig) {
+        targetSetting.style.display = 'none';
+        targetSelect.replaceChildren();
+        return;
+    }
+
+    targetSetting.style.display = 'flex';
+    targetLabel.textContent = targetConfig.label;
+    targetSelect.replaceChildren();
+    for (let index = 1; index <= targetConfig.count; index++) {
+        const option = document.createElement('option');
+        option.value = String(index);
+        option.textContent = `${String(index).padStart(2, '0')} - ${targetConfig.prefix} ${index}`;
+        targetSelect.appendChild(option);
+    }
+    targetSelect.value = String(selectedValue);
+}
+
 // Save settings to the action
 function saveSettings() {
     const settings = {};
@@ -157,10 +193,16 @@ function saveSettings() {
         settings.x32Host = hostInput.value.trim();
     }
     
-    // Get channel settings
-    const channelSelect = document.getElementById('channel');
-    if (channelSelect && channelSelect.value) {
-        settings.channel = parseInt(channelSelect.value);
+    const targetTypeSelect = document.getElementById('targetType');
+    const targetNumberSelect = document.getElementById('targetNumber');
+    if (targetTypeSelect) {
+        settings.targetType = targetTypeSelect.value;
+    }
+    if (targetNumberSelect && targetNumberSelect.value) {
+        settings.targetNumber = parseInt(targetNumberSelect.value);
+        if (settings.targetType === 'channel') {
+            settings.channel = settings.targetNumber;
+        }
     }
     
     // Get scene settings
@@ -282,6 +324,14 @@ function showStatus(type, message) {
 
 // Set up event listeners when the page loads
 document.addEventListener('DOMContentLoaded', function() {
+    const targetTypeSelect = document.getElementById('targetType');
+    if (targetTypeSelect) {
+        targetTypeSelect.addEventListener('change', function() {
+            updateFaderTargetOptions(this.value, 1);
+        });
+        updateFaderTargetOptions(targetTypeSelect.value);
+    }
+
     // Add change listeners to all inputs
     const inputs = document.querySelectorAll('input, select');
     inputs.forEach(input => {

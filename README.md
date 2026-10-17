@@ -2,12 +2,14 @@
 
 A comprehensive Stream Deck plugin for controlling Behringer X32 digital mixers through OSC (Open Sound Control) protocol. This plugin provides extensive control over channel muting, fader levels, DCA groups, mute groups, and scene recall directly from your Stream Deck, with enhanced support for Stream Deck+ dials.
 
-Current release: v2.0.8.0
+Current release: v2.0.9.0
 
 This build is refreshed for current Elgato tooling and Stream Deck software v7.5+, using the modern Stream Deck SDK v3 runtime. It includes a clean rebuild, version-aligned packaging, and a fix for the property inspector connection test status flow.
 
 ## Recent Updates
 
+- Added Stream Deck+ dial fader control for Main L/R, bus masters (1-16), matrices (1-6), and DCA groups (1-8), alongside input channels
+- Added live target selection and mixer feedback for all supported fader targets
 - Refreshed the plugin to the current Elgato SDK/CLI toolchain (`@elgato/streamdeck` v2.1.2, `@elgato/cli` v1.9.0)
 - Updated the TypeScript and build configuration for current tooling compatibility
 - Rebuilt and re-packaged the plugin bundle to ensure the generated `.streamDeckPlugin` archive reflects the current source and manifest version
@@ -17,8 +19,9 @@ This build is refreshed for current Elgato tooling and Stream Deck software v7.5
 ## 🎛️ Features
 
 - **Channel Mute/Unmute**: Toggle mute status for any of the 32 input channels
-- **Enhanced Channel Fader Control**: 
-  - Precise fader level control optimized for Stream Deck+ dials
+- **Enhanced Mixer Fader Control**:
+  - Precise fader level control for input channels, Main L/R, bus masters, matrices, and DCA groups
+  - Main L/R, 16 buses, 6 matrices, and 8 DCA faders can be selected from the property inspector
   - Configurable dial press actions (mute/unmute, unity gain, fine adjustment)
   - Visual feedback with current level and mute status
   - Fine adjustment mode for precise control
@@ -79,14 +82,14 @@ This build is refreshed for current Elgato tooling and Stream Deck software v7.5
 - **Usage**: Press to toggle mute state
 - **Feedback**: Button shows muted (red) or unmuted (green) state
 
-### Channel Fader ⭐ *Enhanced for Stream Deck+*
+### Mixer Fader ⭐ *Enhanced for Stream Deck+*
 - **Function**: Precision fader control with advanced dial support
 - **Configuration**:
-  - Channel number (1-32)
+  - Target: input channel (1-32), Main L/R, bus master (1-16), matrix (1-6), or DCA (1-8)
   - Step size for normal adjustments (1%-10%)
   - Fine step size for precision control (0.1%-2.5%)
   - **Configurable dial press action**:
-    - **Mute/Unmute** (default): Press dial to toggle channel mute
+    - **Mute/Unmute** (default): Press dial to toggle target mute
     - **Unity Gain**: Press dial to set fader to 0dB
     - **Fine Adjustment**: Hold dial for precision control
   - X32 connection settings
@@ -240,6 +243,13 @@ The plugin uses these primary OSC addresses:
 ### Channel Control
 - **Channel Mute**: `/ch/01/mix/on` (where 01 is channel number, padded)
 - **Channel Fader**: `/ch/01/mix/fader` (0.0 to 1.0 range)
+
+### Mixer Fader Targets
+- **Main L/R**: `/main/st/mix/fader`
+- **Bus Masters**: `/bus/01/mix/fader` (buses 1-16)
+- **Matrices**: `/mtx/01/mix/fader` (matrices 1-6)
+- **DCA Groups**: `/dca/1/fader` (DCA groups 1-8)
+- All targets also support mute status and mute control through their corresponding `/on` address.
 
 ### DCA Control  
 - **DCA Mute**: `/dca/1/on` (where 1 is DCA number)
